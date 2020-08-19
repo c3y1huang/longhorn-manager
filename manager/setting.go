@@ -10,18 +10,23 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// GetSettingValueExisted gets longhorn setting value for the given name
 func (m *VolumeManager) GetSettingValueExisted(sName types.SettingName) (string, error) {
 	return m.ds.GetSettingValueExisted(sName)
 }
 
+// GetSetting gets longhorn Setting for the given name
 func (m *VolumeManager) GetSetting(sName types.SettingName) (*longhorn.Setting, error) {
 	return m.ds.GetSetting(sName)
 }
 
+// ListSettings returns a single object contains all longhorn Setting
 func (m *VolumeManager) ListSettings() (map[types.SettingName]*longhorn.Setting, error) {
 	return m.ds.ListSettings()
 }
 
+// ListSettingsSorted returns a single sorted object contains all longhorn
+// Setting
 func (m *VolumeManager) ListSettingsSorted() ([]*longhorn.Setting, error) {
 	settingMap, err := m.ListSettings()
 	if err != nil {
@@ -39,6 +44,8 @@ func (m *VolumeManager) ListSettingsSorted() ([]*longhorn.Setting, error) {
 	return settings, nil
 }
 
+// CreateOrUpdateSetting validates and update the given Setting to
+// Kubernetes longhorn setting
 func (m *VolumeManager) CreateOrUpdateSetting(s *longhorn.Setting) (*longhorn.Setting, error) {
 	err := m.ds.ValidateSetting(s.Name, s.Value)
 	if err != nil {

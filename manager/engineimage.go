@@ -17,14 +17,18 @@ import (
 )
 
 var (
+	// WaitForEngineImageCount is the number of retries until engine image is ready
 	WaitForEngineImageCount    = 20
+	// WaitForEngineImageInterval is the wait time for each retry until engine image is ready
 	WaitForEngineImageInterval = 6 * time.Second
 )
 
+// ListEngineImagesByName returns a single object of all EngineImage
 func (m *VolumeManager) ListEngineImagesByName() (map[string]*longhorn.EngineImage, error) {
 	return m.ds.ListEngineImages()
 }
 
+// ListEngineImagesSorted returns a single sorted object of all EngineImage
 func (m *VolumeManager) ListEngineImagesSorted() ([]*longhorn.EngineImage, error) {
 	engineImageMap, err := m.ListEngineImagesByName()
 	if err != nil {
@@ -43,15 +47,18 @@ func (m *VolumeManager) ListEngineImagesSorted() ([]*longhorn.EngineImage, error
 
 }
 
+// GetEngineImageByName gets the EngineTime for the given name
 func (m *VolumeManager) GetEngineImageByName(name string) (*longhorn.EngineImage, error) {
 	return m.ds.GetEngineImage(name)
 }
 
+// GetEngineImage returns the EngineImage with the given base image name
 func (m *VolumeManager) GetEngineImage(image string) (*longhorn.EngineImage, error) {
 	name := types.GetEngineImageChecksumName(image)
 	return m.ds.GetEngineImage(name)
 }
 
+// CreateEngineImage creates engine image for the given image
 func (m *VolumeManager) CreateEngineImage(image string) (*longhorn.EngineImage, error) {
 	image = strings.TrimSpace(image)
 	if image == "" {
@@ -75,6 +82,8 @@ func (m *VolumeManager) CreateEngineImage(image string) (*longhorn.EngineImage, 
 	return ei, nil
 }
 
+// DeleteEngineImageByName deletes engine image for the given name.
+// Returns error when is being used
 func (m *VolumeManager) DeleteEngineImageByName(name string) error {
 	ei, err := m.GetEngineImageByName(name)
 	if err != nil {
@@ -100,6 +109,7 @@ func (m *VolumeManager) DeleteEngineImageByName(name string) error {
 	return nil
 }
 
+// DeployAndWaitForEngineImage creates and wait for engine image to be ready
 func (m *VolumeManager) DeployAndWaitForEngineImage(image string) error {
 	if _, err := m.GetEngineImage(image); err != nil {
 		if datastore.ErrorIsNotFound(err) {
@@ -116,6 +126,7 @@ func (m *VolumeManager) DeployAndWaitForEngineImage(image string) error {
 	return nil
 }
 
+// WaitForEngineImage wait for engine image to be ready
 func (m *VolumeManager) WaitForEngineImage(image string) error {
 	for i := 0; i < WaitForEngineImageCount; i++ {
 		ei, err := m.GetEngineImage(image)
@@ -132,6 +143,8 @@ func (m *VolumeManager) WaitForEngineImage(image string) error {
 	return fmt.Errorf("Wait for engine image %v timed out", image)
 }
 
+// CheckEngineImageReadiness returns error if engine image resource state is
+// not ready
 func (m *VolumeManager) CheckEngineImageReadiness(image string) error {
 	ei, err := m.GetEngineImage(image)
 	if err != nil {

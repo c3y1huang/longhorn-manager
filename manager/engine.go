@@ -15,9 +15,12 @@ import (
 )
 
 const (
+	// BackupStatusQueryInterval is the time to wait to check for backup progress
 	BackupStatusQueryInterval = 2 * time.Second
 )
 
+// ListSnapshots returns a single object contains all snapshots of the volume engine for 
+// the given name 
 func (m *VolumeManager) ListSnapshots(volumeName string) (map[string]*types.Snapshot, error) {
 	if volumeName == "" {
 		return nil, fmt.Errorf("volume name required")
@@ -29,6 +32,7 @@ func (m *VolumeManager) ListSnapshots(volumeName string) (map[string]*types.Snap
 	return engine.SnapshotList()
 }
 
+// GetSnapshot gets volume engine Snapshot for the given volume and snapshot name
 func (m *VolumeManager) GetSnapshot(snapshotName, volumeName string) (*types.Snapshot, error) {
 	if volumeName == "" || snapshotName == "" {
 		return nil, fmt.Errorf("volume and snapshot name required")
@@ -47,6 +51,8 @@ func (m *VolumeManager) GetSnapshot(snapshotName, volumeName string) (*types.Sna
 	return snapshot, nil
 }
 
+// CreateSnapshot create the volume engine snapshotfor the given volume name.
+// Returns error if snapsht is not created
 func (m *VolumeManager) CreateSnapshot(snapshotName string, labels map[string]string, volumeName string) (*types.Snapshot, error) {
 	if volumeName == "" {
 		return nil, fmt.Errorf("volume name required")
@@ -77,6 +83,7 @@ func (m *VolumeManager) CreateSnapshot(snapshotName string, labels map[string]st
 	return snap, nil
 }
 
+// DeleteSnapshot deletes the volume engine snapshot for the given volume and snpashot name 
 func (m *VolumeManager) DeleteSnapshot(snapshotName, volumeName string) error {
 	if volumeName == "" || snapshotName == "" {
 		return fmt.Errorf("volume and snapshot name required")
@@ -93,6 +100,9 @@ func (m *VolumeManager) DeleteSnapshot(snapshotName, volumeName string) error {
 	return nil
 }
 
+// RevertSnapshot reverts to the volume engine snapshot for the given volume and
+// snapshot name.
+// Returns error when snapshot not found in the volume engine
 func (m *VolumeManager) RevertSnapshot(snapshotName, volumeName string) error {
 	if volumeName == "" || snapshotName == "" {
 		return fmt.Errorf("volume and snapshot name required")
@@ -116,6 +126,7 @@ func (m *VolumeManager) RevertSnapshot(snapshotName, volumeName string) error {
 	return nil
 }
 
+// PurgeSnapshot purges the volume engine snapshot for the given volume name
 func (m *VolumeManager) PurgeSnapshot(volumeName string) error {
 	if volumeName == "" {
 		return fmt.Errorf("volume name required")
@@ -133,6 +144,8 @@ func (m *VolumeManager) PurgeSnapshot(volumeName string) error {
 	return nil
 }
 
+// BackupSnapshot backups up snapshot to the given target URL for the given snapshot and volume name.
+// Waits forever until backup finish and updates to volume last backup
 func (m *VolumeManager) BackupSnapshot(snapshotName string, labels map[string]string, volumeName string) error {
 	if volumeName == "" || snapshotName == "" {
 		return fmt.Errorf("volume and snapshot name required")
@@ -195,6 +208,12 @@ func (m *VolumeManager) BackupSnapshot(snapshotName string, labels map[string]st
 	return nil
 }
 
+// GetEngineClient creates new EngineClient with the given volume name.
+// Returns error when:
+//   * no engine resource found for the volume
+//   * multiple engine resource found for the volume
+//   * engine not running
+//   * engine image not ready for the engine
 func (m *VolumeManager) GetEngineClient(volumeName string) (client engineapi.EngineClient, err error) {
 	var e *longhorn.Engine
 
@@ -230,6 +249,8 @@ func (m *VolumeManager) GetEngineClient(volumeName string) (client engineapi.Eng
 	})
 }
 
+// ListBackupVolumes gets all backup volumes, sync with volume last backup, and 
+// returns a single object contains all BackupVolume
 func (m *VolumeManager) ListBackupVolumes() (map[string]*engineapi.BackupVolume, error) {
 	backupTarget, err := GenerateBackupTarget(m.ds)
 	if err != nil {
@@ -245,6 +266,8 @@ func (m *VolumeManager) ListBackupVolumes() (map[string]*engineapi.BackupVolume,
 	return backupVolumes, nil
 }
 
+// GetBackupVolume get backup volume for the given name, sync with volume last backup, and
+// returns BackupVolume
 func (m *VolumeManager) GetBackupVolume(volumeName string) (*engineapi.BackupVolume, error) {
 	backupTarget, err := GenerateBackupTarget(m.ds)
 	if err != nil {
@@ -259,6 +282,7 @@ func (m *VolumeManager) GetBackupVolume(volumeName string) (*engineapi.BackupVol
 	return bv, nil
 }
 
+// DeleteBackupVolume deletes backup volume for the given name
 func (m *VolumeManager) DeleteBackupVolume(volumeName string) error {
 	backupTarget, err := GenerateBackupTarget(m.ds)
 	if err != nil {
@@ -275,6 +299,7 @@ func (m *VolumeManager) DeleteBackupVolume(volumeName string) error {
 	return nil
 }
 
+// ListBackupsForVolume lists backup for the given volume name
 func (m *VolumeManager) ListBackupsForVolume(volumeName string) ([]*engineapi.Backup, error) {
 	backupTarget, err := GenerateBackupTarget(m.ds)
 	if err != nil {
@@ -284,6 +309,7 @@ func (m *VolumeManager) ListBackupsForVolume(volumeName string) ([]*engineapi.Ba
 	return backupTarget.List(volumeName)
 }
 
+// GetBackup returns Backup from the composed URL for backup and volume 
 func (m *VolumeManager) GetBackup(backupName, volumeName string) (*engineapi.Backup, error) {
 	backupTarget, err := GenerateBackupTarget(m.ds)
 	if err != nil {
@@ -294,6 +320,8 @@ func (m *VolumeManager) GetBackup(backupName, volumeName string) (*engineapi.Bac
 	return backupTarget.GetBackup(url)
 }
 
+// DeleteBackup deletes backup from the composed URL for backup and volume, and
+// update to volume last backup.
 func (m *VolumeManager) DeleteBackup(backupName, volumeName string) error {
 	backupTarget, err := GenerateBackupTarget(m.ds)
 	if err != nil {

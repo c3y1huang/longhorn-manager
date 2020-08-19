@@ -11,18 +11,23 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// GetInstanceManager returns InstanceManager for the given name
 func (m *VolumeManager) GetInstanceManager(name string) (*longhorn.InstanceManager, error) {
 	return m.ds.GetInstanceManager(name)
 }
 
+// ListInstanceManagers returns single object contains all InstanceManager
 func (m *VolumeManager) ListInstanceManagers() (map[string]*longhorn.InstanceManager, error) {
 	return m.ds.ListInstanceManagers()
 }
 
+// GetNode returns Node for the given name
 func (m *VolumeManager) GetNode(name string) (*longhorn.Node, error) {
 	return m.ds.GetNode(name)
 }
 
+// GetDiskTags returns a list of all disk tags, duplicated tags
+// will been treated as one
 func (m *VolumeManager) GetDiskTags() ([]string, error) {
 	foundTags := make(map[string]struct{})
 	var tags []string
@@ -44,6 +49,8 @@ func (m *VolumeManager) GetDiskTags() ([]string, error) {
 	return tags, nil
 }
 
+// GetNodeTags returns a list of all node tags, duplicated
+// tags will be treated as one
 func (m *VolumeManager) GetNodeTags() ([]string, error) {
 	foundTags := make(map[string]struct{})
 	var tags []string
@@ -63,6 +70,8 @@ func (m *VolumeManager) GetNodeTags() ([]string, error) {
 	return tags, nil
 }
 
+// UpdateNode update node for the given Node object.
+// Returns error the node tag is not qualified to Kubernetes
 func (m *VolumeManager) UpdateNode(n *longhorn.Node) (*longhorn.Node, error) {
 	// We need to make sure the tags passed in are valid before updating the node.
 	tags, err := util.ValidateTags(n.Spec.Tags)
@@ -79,6 +88,7 @@ func (m *VolumeManager) UpdateNode(n *longhorn.Node) (*longhorn.Node, error) {
 	return node, nil
 }
 
+// ListNodes returns a single object contains all longhorn Node
 func (m *VolumeManager) ListNodes() (map[string]*longhorn.Node, error) {
 	nodeList, err := m.ds.ListNodes()
 	if err != nil {
@@ -87,6 +97,7 @@ func (m *VolumeManager) ListNodes() (map[string]*longhorn.Node, error) {
 	return nodeList, nil
 }
 
+// ListNodesSorted returns a single sorted object contains all longhorn Node
 func (m *VolumeManager) ListNodesSorted() ([]*longhorn.Node, error) {
 	nodeMap, err := m.ListNodes()
 	if err != nil {
@@ -104,6 +115,10 @@ func (m *VolumeManager) ListNodesSorted() ([]*longhorn.Node, error) {
 	return nodes, nil
 }
 
+// DiskUpdate update node disk. Returns error when:
+// * the given DiskSpec StorageReserved is negative
+// * the given DiskSpec tags are not qualified to kubernetest
+// * the node Disks StoreageScheduled is not 0
 func (m *VolumeManager) DiskUpdate(name string, updateDisks map[string]types.DiskSpec) (*longhorn.Node, error) {
 	node, err := m.ds.GetNode(name)
 	if err != nil {
@@ -143,6 +158,13 @@ func (m *VolumeManager) DiskUpdate(name string, updateDisks map[string]types.Dis
 	return node, nil
 }
 
+// DeleteNode deletes longhorn node for the given name.
+// Returns error when:
+// * node status is ready
+// * node is not gone and manager pod is not missing
+// * node is allow scheduling
+// * node replica still running
+// * node engine still running
 func (m *VolumeManager) DeleteNode(name string) error {
 	node, err := m.ds.GetNode(name)
 	if err != nil {

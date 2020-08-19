@@ -16,9 +16,12 @@ import (
 )
 
 var (
+	// ConflictRetryCount is the number of retry during update conflicts
 	ConflictRetryCount = 5
 )
 
+// UpdateVolumeLastBackup gets the backup volume for the given name, and 
+// updates to volume last backup
 func UpdateVolumeLastBackup(volumeName string, backupTarget *engineapi.BackupTarget,
 	getVolume func(name string) (*longhorn.Volume, error),
 	updateVolume func(v *longhorn.Volume) (*longhorn.Volume, error)) (err error) {
@@ -34,6 +37,8 @@ func UpdateVolumeLastBackup(volumeName string, backupTarget *engineapi.BackupTar
 	return SyncVolumeLastBackupWithBackupVolume(volumeName, backupVolume, getVolume, updateVolume)
 }
 
+// SyncVolumeLastBackupWithBackupVolume updates volume last backup status with the given 
+// BackupVolume
 func SyncVolumeLastBackupWithBackupVolume(volumeName string, backupVolume *engineapi.BackupVolume,
 	getVolume func(name string) (*longhorn.Volume, error),
 	updateVolume func(v *longhorn.Volume) (*longhorn.Volume, error)) (err error) {
@@ -80,6 +85,7 @@ func SyncVolumeLastBackupWithBackupVolume(volumeName string, backupVolume *engin
 	return fmt.Errorf("Cannot update LastBackup for volume %v due to too many conflicts", volumeName)
 }
 
+// SyncVolumesLastBackupWithBackupVolumes updates volume last backup status for the listed volumes
 func SyncVolumesLastBackupWithBackupVolumes(backupVolumes map[string]*engineapi.BackupVolume,
 	listVolumes func() (map[string]*longhorn.Volume, error),
 	getVolume func(name string) (*longhorn.Volume, error),
@@ -111,6 +117,7 @@ func SyncVolumesLastBackupWithBackupVolumes(backupVolumes map[string]*engineapi.
 	}
 }
 
+// GenerateBackupTarget creates new BackupTarget
 func GenerateBackupTarget(ds *datastore.DataStore) (*engineapi.BackupTarget, error) {
 	targetURL, err := ds.GetSettingValueExisted(types.SettingNameBackupTarget)
 	if err != nil {
@@ -127,6 +134,7 @@ func GenerateBackupTarget(ds *datastore.DataStore) (*engineapi.BackupTarget, err
 	return engineapi.NewBackupTarget(targetURL, engineImage, credential), nil
 }
 
+// GetBackupCredentialConfig get s3 credentials
 func GetBackupCredentialConfig(ds *datastore.DataStore) (map[string]string, error) {
 	backupTarget, err := ds.GetSettingValueExisted(types.SettingNameBackupTarget)
 	if err != nil {

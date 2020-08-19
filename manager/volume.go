@@ -29,6 +29,7 @@ const (
 	MaxRecurringJobRetain = 50
 )
 
+// NewVolumeManager returns a new VolumeManager
 func NewVolumeManager(currentNodeID string, ds *datastore.DataStore) *VolumeManager {
 	return &VolumeManager{
 		ds: ds,
@@ -37,10 +38,14 @@ func NewVolumeManager(currentNodeID string, ds *datastore.DataStore) *VolumeMana
 	}
 }
 
+// GetCurrentNodeID returns VolumeManager currentNodeID
 func (m *VolumeManager) GetCurrentNodeID() string {
 	return m.currentNodeID
 }
 
+// Node2APIAddress returns the node IP with default API port where manager pod
+// is running.
+// Returns when the given node name not exist
 func (m *VolumeManager) Node2APIAddress(nodeID string) (string, error) {
 	nodeIPMap, err := m.ds.GetManagerNodeIPMap()
 	if err != nil {
@@ -53,6 +58,7 @@ func (m *VolumeManager) Node2APIAddress(nodeID string) (string, error) {
 	return types.GetAPIServerAddressFromIP(ip), nil
 }
 
+// List returns a single object contains all the longhorn Volume
 func (m *VolumeManager) List() (map[string]*longhorn.Volume, error) {
 	return m.ds.ListVolumes()
 }
@@ -78,6 +84,7 @@ func sortKeys(mapObj interface{}) ([]string, error) {
 	return keys, nil
 }
 
+// ListSorted returns a single sorted object contains all the longhorn volumes
 func (m *VolumeManager) ListSorted() ([]*longhorn.Volume, error) {
 	volumeMap, err := m.List()
 	if err != nil {
@@ -95,14 +102,19 @@ func (m *VolumeManager) ListSorted() ([]*longhorn.Volume, error) {
 	return volumes, nil
 }
 
+// Get gets the Volume for the given volume name
 func (m *VolumeManager) Get(vName string) (*longhorn.Volume, error) {
 	return m.ds.GetVolume(vName)
 }
 
+// GetEngines returns single object contains all Longhorn Engines with label marked
+// for the given volume name
 func (m *VolumeManager) GetEngines(vName string) (map[string]*longhorn.Engine, error) {
 	return m.ds.ListVolumeEngines(vName)
 }
 
+// GetEnginesSorted returns a sorted list of Longhorn Engine with label marked
+// for the given volume name
 func (m *VolumeManager) GetEnginesSorted(vName string) ([]*longhorn.Engine, error) {
 	engineMap, err := m.ds.ListVolumeEngines(vName)
 	if err != nil {
@@ -120,10 +132,14 @@ func (m *VolumeManager) GetEnginesSorted(vName string) ([]*longhorn.Engine, erro
 	return engines, nil
 }
 
+// GetReplicas returns a single object contains all Replica with label marked
+// for the given volume name
 func (m *VolumeManager) GetReplicas(vName string) (map[string]*longhorn.Replica, error) {
 	return m.ds.ListVolumeReplicas(vName)
 }
 
+// GetReplicasSorted returns a sorted list of Replica with label marked
+// for the given volume name
 func (m *VolumeManager) GetReplicasSorted(vName string) ([]*longhorn.Replica, error) {
 	replicaMap, err := m.ds.ListVolumeReplicas(vName)
 	if err != nil {
@@ -149,6 +165,17 @@ func (m *VolumeManager) getDefaultReplicaCount() (int, error) {
 	return int(c), nil
 }
 
+// Create the Longhorn Volume resources for the given name and VolumeSpec.
+// This uses the backup volume size if the given volume is fromBackup.
+// This rounds the volume size to 4096.
+// This ensures volume replica is not 0.
+// And returns error when:
+// * the name contains charactors that is not alphabetic, numberic, "_", ".", "-".
+// * the name starts with charactors that is not alphabetic or numberic. 
+// * the EngineImage state is not ready
+// * the frondend type is not blockdev or iscsi
+// * the MountPropagation is disabled on any of the nodes
+// * Invalid recurring Jobs
 func (m *VolumeManager) Create(name string, spec *types.VolumeSpec) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to create volume %v", name)
@@ -247,6 +274,7 @@ func (m *VolumeManager) Create(name string, spec *types.VolumeSpec) (v *longhorn
 	return v, nil
 }
 
+// Delete Longhorn Volume for the given name
 func (m *VolumeManager) Delete(name string) error {
 	if err := m.ds.DeleteVolume(name); err != nil {
 		return err
@@ -255,6 +283,13 @@ func (m *VolumeManager) Delete(name string) error {
 	return nil
 }
 
+// Attach updates the Volume for the given nodeID and disableFrontend.
+// Returns error when:
+// * the Volume state is not detached.
+// * the EngineImage state is not ready.
+// * the Volume condition is not scheduled.
+// * the Volume condition is restore.
+// * the Volume NodeID is not empty and does not match the given nodeID
 func (m *VolumeManager) Attach(name, nodeID string, disableFrontend bool) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to attach volume %v to %v", name, nodeID)
@@ -298,6 +333,9 @@ func (m *VolumeManager) Attach(name, nodeID string, disableFrontend bool) (v *lo
 	return v, nil
 }
 
+// Detach updates Volume NodeID to "" and DisableFrontend to false for the
+// given name.
+// Returns error when the Volume state is not attached and attaching
 func (m *VolumeManager) Detach(name string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to detach volume %v", name)
@@ -327,6 +365,12 @@ func (m *VolumeManager) Detach(name string) (v *longhorn.Volume, err error) {
 	return v, nil
 }
 
+// Salvage updates the Volume with empty NodeID for the given volume name,
+// and updates Replicas with empty FaultAt for the given replica name.
+// Returns error when:
+// * the Volume state is not detached
+// * the Volume state robustness is not false
+// * the given replica name's Replica VolumeName not equal to the Volume name
 func (m *VolumeManager) Salvage(volumeName string, replicaNames []string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to salvage volume %v", volumeName)
@@ -370,6 +414,12 @@ func (m *VolumeManager) Salvage(volumeName string, replicaNames []string) (v *lo
 	return v, nil
 }
 
+// Activate updates the Volume Spec.Standby to false and Spec.Frontend for
+// the given frontend and volume name.
+// Returns error when:
+// * the Volume status is not standby
+// * the Volume spec is not standby
+// * the given frontend is not blockdev and iscsi
 func (m *VolumeManager) Activate(volumeName string, frontend string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to activate volume %v", volumeName)
@@ -432,6 +482,12 @@ func (m *VolumeManager) Activate(volumeName string, frontend string) (v *longhor
 	return v, nil
 }
 
+// Expand updates the Volume Spec.DisableFrontend to true and Spec.Size for the
+// given volume size and volume name.
+// Returns error when:
+// the Volume state is not detached
+// the Volume condition is not scheduled
+// the Volume size is not smaller than the given size
 func (m *VolumeManager) Expand(volumeName string, size int64) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to expand volume %v", volumeName)
@@ -467,6 +523,14 @@ func (m *VolumeManager) Expand(volumeName string, size int64) (v *longhorn.Volum
 	return v, nil
 }
 
+// CancelExpansion updates the Volume size to the current Engine size for the
+// given volume name.
+// Returns error when:
+// * the Volume status does not have ExpansionRequired
+// * the Volume status is standby
+// * more than 1 Engine found for the Volume name
+// * the Engine status is expanding
+// * the Engine current size equals to the Volume size
 func (m *VolumeManager) CancelExpansion(volumeName string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to cancel expansion for volume %v", volumeName)
@@ -512,6 +576,8 @@ func (m *VolumeManager) CancelExpansion(volumeName string) (v *longhorn.Volume, 
 	return v, nil
 }
 
+// UpdateRecurringJobs updates the Volume.Spec.RecurringJob for the given jobs.
+// Returns error when the given jobs are invalid or has duplicates
 func (m *VolumeManager) UpdateRecurringJobs(volumeName string, jobs []types.RecurringJob) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to update volume recurring jobs for %v", volumeName)
@@ -546,6 +612,15 @@ func (m *VolumeManager) checkDuplicateJobs(recurringJobs []types.RecurringJob) e
 	return nil
 }
 
+// validateRecurringJobs checkes for the given RecurringJob
+// Returns error when:
+// * job.[Cron, Task, Name] is empty
+// * job.Retain equals to 0
+// * job.Cron contains invalid cron format
+// * job.Name length is more than MaximumJobNameSize
+// * invalid job.Labels
+// * has duplicated job
+// * the total of the given jobs are more than the MaxRecurringJobRetain
 func (m *VolumeManager) validateRecurringJobs(jobs []types.RecurringJob) error {
 	if jobs == nil {
 		return nil
@@ -579,6 +654,10 @@ func (m *VolumeManager) validateRecurringJobs(jobs []types.RecurringJob) error {
 	return nil
 }
 
+// DeleteReplica deletes Replica for the given volume name and replica name.
+// Returns error when:
+// * the given replica name not exist in Replica
+// * no other heathy Replica exist for Volume
 func (m *VolumeManager) DeleteReplica(volumeName, replicaName string) error {
 	hasHealthyReplicas := false
 	rs, err := m.ds.ListVolumeReplicas(volumeName)
@@ -607,6 +686,8 @@ func (m *VolumeManager) DeleteReplica(volumeName, replicaName string) error {
 	return nil
 }
 
+// GetManagerNodeIPMap returns and object with PodIP mapped to the NodeName.
+// Returns error when same node name exist in more than 1 Pod
 func (m *VolumeManager) GetManagerNodeIPMap() (map[string]string, error) {
 	podList, err := m.ds.ListManagerPods()
 	if err != nil {
@@ -623,6 +704,14 @@ func (m *VolumeManager) GetManagerNodeIPMap() (map[string]string, error) {
 	return nodeIPMap, nil
 }
 
+// EngineUpgrade updates the Volume.Spec.EngineImage to the given image and verifies
+// the update.
+// Returns error when:
+// * the EngineImage status is not ready
+// * the Volume.Spec.EngineImage already is the given image
+// * the Volume.Spec.EngineImage and the given image not equal to the Volume.Status.CurrentImage
+// * the Volume state is attached, the state is standby and robustness is not healthy
+// * the Volume.Status.Current image not updated
 func (m *VolumeManager) EngineUpgrade(volumeName, image string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "cannot upgrade engine for volume %v using image %v", volumeName, image)
@@ -668,6 +757,12 @@ func (m *VolumeManager) EngineUpgrade(volumeName, image string) (v *longhorn.Vol
 	return v, nil
 }
 
+// UpdateReplicaCount updates the Volume.Spec.NumberOfReplicas for the given number.
+// Returns error when:
+// * the given count exceeds 1~20
+// * the Volume NodeID is empty
+// * the Volume state is not attached
+// * the Volume EngineImage not equal to its current image
 func (m *VolumeManager) UpdateReplicaCount(name string, count int) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to update replica count for volume %v", name)

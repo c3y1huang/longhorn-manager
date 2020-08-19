@@ -15,6 +15,9 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// PVCreate creates persistent volume with the default longhorn storage class
+// for the given volume name.
+// Returns error when volume is already referenced by a persistent volume.
 func (m *VolumeManager) PVCreate(name, pvName, fsType string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to create PV for volume %v", name)
@@ -52,6 +55,9 @@ func (m *VolumeManager) PVCreate(name, pvName, fsType string) (v *longhorn.Volum
 	return v, nil
 }
 
+// PVCCreate creates a persistent volume claim for the given name.
+// This waits for volume to be available or released, and cleanup
+// the persistent volume ClaimRef for it to be reused.
 func (m *VolumeManager) PVCCreate(name, namespace, pvcName string) (v *longhorn.Volume, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "unable to create PVC for volume %v", name)

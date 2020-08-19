@@ -51,6 +51,7 @@ type SupportBundle struct {
 	ProgressPercentage int
 }
 
+// GetSupportBundle returns SupportBundle if the given name exist in VolumeManager
 func (m *VolumeManager) GetSupportBundle(name string) (*SupportBundle, error) {
 	if m.sb.Name != name {
 		return nil, errors.Errorf("cannot find bundle %s", name)
@@ -59,12 +60,15 @@ func (m *VolumeManager) GetSupportBundle(name string) (*SupportBundle, error) {
 	return m.sb, nil
 }
 
+// DeleteSupportBundle deletes the support bundle file and directory, and
+// clears the SupportBundle object
 func (m *VolumeManager) DeleteSupportBundle() {
 	os.Remove(filepath.Join("/tmp", m.sb.Filename))
 	os.RemoveAll(filepath.Join("/tmp", m.sb.Name))
 	m.sb = nil
 }
 
+// GetBundleFileHandler returns the support bundle ReadCloser interface
 func (m *VolumeManager) GetBundleFileHandler() (io.ReadCloser, error) {
 	f, err := os.Open(filepath.Join("/tmp", m.sb.Filename))
 	if err != nil {
@@ -74,10 +78,12 @@ func (m *VolumeManager) GetBundleFileHandler() (io.ReadCloser, error) {
 	return f, nil
 }
 
+// GetLonghornEventList returns longhorn event list
 func (m *VolumeManager) GetLonghornEventList() (*v1.EventList, error) {
 	return m.ds.GetLonghornEventList()
 }
 
+// BundleMeta object
 type BundleMeta struct {
 	LonghornVersion       string `json:"longhornVersion"`
 	KubernetesVersion     string `json:"kubernetesVersion"`
@@ -87,7 +93,7 @@ type BundleMeta struct {
 	IssueDescription      string `json:"issueDescription"`
 }
 
-// GenerateSupportBundle covers:
+// GenerateSupportBundle creates a compressed bundle file, covers:
 // 1. YAMLs of the Longhorn related CRDs
 // 2. YAMLs of pods, services, daemonset, deployment in longhorn namespace
 // 3. All the logs of pods in the longhorn namespace
@@ -382,6 +388,8 @@ func streamLogToFile(logStream io.ReadCloser, path string, errLog io.Writer) {
 	}
 }
 
+// InitSupportBundle deletes the existing SupportBundle, resets the SupportBundle and
+// creates new support bundle
 func (m *VolumeManager) InitSupportBundle(issueURL string, description string) (*SupportBundle, error) {
 	if m.sb != nil {
 		// Clear the object and references as previous support bundle got expired
