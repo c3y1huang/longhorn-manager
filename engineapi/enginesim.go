@@ -7,6 +7,7 @@ import (
 	"github.com/longhorn/longhorn-manager/types"
 )
 
+// EngineSimulatorRequest object
 type EngineSimulatorRequest struct {
 	VolumeName     string
 	VolumeSize     int64
@@ -14,11 +15,13 @@ type EngineSimulatorRequest struct {
 	ReplicaAddrs   []string
 }
 
+// EngineSimulatorCollection contains the engine simulators
 type EngineSimulatorCollection struct {
 	simulators map[string]*EngineSimulator
 	mutex      *sync.Mutex
 }
 
+// NewEngineSimulatorCollection creates new EngineSimulatorCollection
 func NewEngineSimulatorCollection() *EngineSimulatorCollection {
 	return &EngineSimulatorCollection{
 		simulators: map[string]*EngineSimulator{},
@@ -26,6 +29,8 @@ func NewEngineSimulatorCollection() *EngineSimulatorCollection {
 	}
 }
 
+// CreateEngineSimulator creates new simulator in the EngineSimulatorCollection for the given
+// request, and returns error when volume or replica already exist in the collection
 func (c *EngineSimulatorCollection) CreateEngineSimulator(request *EngineSimulatorRequest) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -50,6 +55,9 @@ func (c *EngineSimulatorCollection) CreateEngineSimulator(request *EngineSimulat
 	return nil
 }
 
+
+// GetEngineSimulator returns the EngineSimulator for the given volume name.
+// This returns error if volume not pre-exist in the collection
 func (c *EngineSimulatorCollection) GetEngineSimulator(volumeName string) (*EngineSimulator, error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -60,6 +68,8 @@ func (c *EngineSimulatorCollection) GetEngineSimulator(volumeName string) (*Engi
 	return c.simulators[volumeName], nil
 }
 
+// DeleteEngineSimulator marks the volume to not running and removes the volume from collection,
+// This returns error if volume not pre-exist in the collection
 func (c *EngineSimulatorCollection) DeleteEngineSimulator(volumeName string) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -73,6 +83,8 @@ func (c *EngineSimulatorCollection) DeleteEngineSimulator(volumeName string) err
 	return nil
 }
 
+// NewEngineClient returns an EngineSimulator of the given volume name. 
+// This returns error if no matching volume name found in the collection
 func (c *EngineSimulatorCollection) NewEngineClient(request *EngineClientRequest) (EngineClient, error) {
 	engine, err := c.GetEngineSimulator(request.VolumeName)
 	if err != nil {
@@ -81,6 +93,7 @@ func (c *EngineSimulatorCollection) NewEngineClient(request *EngineClientRequest
 	return engine, nil
 }
 
+// EngineSimulator contains the volume info and running state for the volume
 type EngineSimulator struct {
 	volumeName     string
 	volumeSize     int64
@@ -90,10 +103,12 @@ type EngineSimulator struct {
 	mutex          *sync.RWMutex
 }
 
+// Name returns volume name from the EngineSimulator
 func (e *EngineSimulator) Name() string {
 	return e.volumeName
 }
 
+// ReplicaList returns a single object of all the replicas in EngineSimulator
 func (e *EngineSimulator) ReplicaList() (map[string]*Replica, error) {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -106,6 +121,9 @@ func (e *EngineSimulator) ReplicaList() (map[string]*Replica, error) {
 	return ret, nil
 }
 
+// ReplicaAdd adds Replica info to the EngineSimulator for the given URL and node.
+// This returns error if any of the existing replica in ERR mode or URL already exist
+// in the EngineSimulator
 func (e *EngineSimulator) ReplicaAdd(url string, isRestoreVolume bool) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
@@ -125,6 +143,8 @@ func (e *EngineSimulator) ReplicaAdd(url string, isRestoreVolume bool) error {
 	return nil
 }
 
+// ReplicaRemove deletes replica in EngineSimulator for the given URL. 
+// This returns error if replica does not exist in EngineSimulator
 func (e *EngineSimulator) ReplicaRemove(addr string) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
@@ -136,6 +156,8 @@ func (e *EngineSimulator) ReplicaRemove(addr string) error {
 	return nil
 }
 
+// SimulateStopReplica marks replica mode in EngineSimulator to ERR.
+// This returns error if replica not exist in EngineSimulator
 func (e *EngineSimulator) SimulateStopReplica(addr string) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()

@@ -33,11 +33,13 @@ const (
 	BackupStateInProgress = "in_progress"
 )
 
+// Replica object
 type Replica struct {
 	URL  string
 	Mode types.ReplicaMode
 }
 
+// Controller object
 type Controller struct {
 	URL    string
 	NodeID string
@@ -167,15 +169,19 @@ func (e ReplicaError) Error() string {
 	return fmt.Sprintf("%v: %v", e.Address, e.Message)
 }
 
+// GetBackendReplicaURL returns the TCP URL for the given address
 func GetBackendReplicaURL(address string) string {
 	return "tcp://" + address
 }
 
+// GetAddressFromBackendReplicaURL removes prefix tcp://
+// for the given URL
 func GetAddressFromBackendReplicaURL(url string) string {
 	// tcp://<address>:<Port>
 	return strings.TrimPrefix(url, "tcp://")
 }
 
+// ValidateReplicaURL checks if given URL starts with tcp://
 func ValidateReplicaURL(url string) error {
 	if !strings.HasPrefix(url, "tcp://") {
 		return fmt.Errorf("invalid replica url %v", url)
@@ -183,6 +189,8 @@ func ValidateReplicaURL(url string) error {
 	return nil
 }
 
+// CheckCLICompatibilty returns error when the manager API
+// verion is less than the minimum version
 func CheckCLICompatibilty(cliVersion, cliMinVersion int) error {
 	if MinCLIVersion > cliVersion || CurrentCLIVersion < cliMinVersion {
 		return fmt.Errorf("Manager current CLI version %v and min CLI version %v is not compatible with CLIVersion %v and CLIMinVersion %v", CurrentCLIVersion, MinCLIVersion, cliVersion, cliMinVersion)
@@ -190,6 +198,8 @@ func CheckCLICompatibilty(cliVersion, cliMinVersion int) error {
 	return nil
 }
 
+// GetEngineProcessFrontend returns frontend device, returns
+// error if volume type not matching blockdev, iscsi or ""
 func GetEngineProcessFrontend(volumeFrontend types.VolumeFrontend) (string, error) {
 	frontend := ""
 	if volumeFrontend == types.VolumeFrontendBlockDev {

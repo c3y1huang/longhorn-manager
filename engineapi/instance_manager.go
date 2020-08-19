@@ -29,6 +29,7 @@ const (
 	DeprecatedInstanceManagerBinaryName   = "longhorn-instance-manager"
 )
 
+// InstanceManagerClient object
 type InstanceManagerClient struct {
 	ip            string
 	apiMinVersion int
@@ -38,11 +39,15 @@ type InstanceManagerClient struct {
 	grpcClient *imclient.ProcessManagerClient
 }
 
+// GetDeprecatedInstanceManagerBinary compose and returns the deprecated 
+// engine binary path on host for the given image
 func GetDeprecatedInstanceManagerBinary(image string) string {
 	cname := types.GetImageCanonicalName(image)
 	return filepath.Join(types.EngineBinaryDirectoryOnHost, cname, DeprecatedInstanceManagerBinaryName)
 }
 
+// CheckInstanceManagerCompatibilty returns an error if the current instance 
+// manager version is less than the minimum version
 func CheckInstanceManagerCompatibilty(imMinVersion, imVersion int) error {
 	if CurrentInstanceManagerAPIVersion > imVersion || CurrentInstanceManagerAPIVersion < imMinVersion {
 		return fmt.Errorf("Current InstanceManager version %v is not compatible with InstanceManagerAPIVersion %v and InstanceManagerAPIMinVersion %v",
@@ -51,6 +56,7 @@ func CheckInstanceManagerCompatibilty(imMinVersion, imVersion int) error {
 	return nil
 }
 
+// NewInstanceManagerClient creates new InstanceManagerClient
 func NewInstanceManagerClient(im *longhorn.InstanceManager) (*InstanceManagerClient, error) {
 	// Do not check the major version here. Since IM cannot get the major version without using this client to call VersionGet().
 	if im.Status.CurrentState != types.InstanceManagerStateRunning || im.Status.IP == "" {
@@ -89,6 +95,7 @@ func (c *InstanceManagerClient) parseProcess(p *imapi.Process) *types.InstancePr
 
 }
 
+// EngineProcessCreate creates a new engine controller gRPC process
 func (c *InstanceManagerClient) EngineProcessCreate(engineName, volumeName, engineImage string, volumeFrontend types.VolumeFrontend, replicaAddressMap map[string]string) (*types.InstanceProcess, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -101,6 +108,7 @@ func (c *InstanceManagerClient) EngineProcessCreate(engineName, volumeName, engi
 	for _, addr := range replicaAddressMap {
 		args = append(args, "--replica", GetBackendReplicaURL(addr))
 	}
+	
 	binary := filepath.Join(types.GetEngineBinaryDirectoryForEngineManagerContainer(engineImage), types.EngineBinaryName)
 
 	engineProcess, err := c.grpcClient.ProcessCreate(
@@ -111,6 +119,7 @@ func (c *InstanceManagerClient) EngineProcessCreate(engineName, volumeName, engi
 	return c.parseProcess(engineProcess), nil
 }
 
+// ReplicaProcessCreate creates a new engine replica gRPC process
 func (c *InstanceManagerClient) ReplicaProcessCreate(replicaName, engineImage, dataPath string, size int64) (*types.InstanceProcess, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -129,6 +138,7 @@ func (c *InstanceManagerClient) ReplicaProcessCreate(replicaName, engineImage, d
 	return c.parseProcess(replicaProcess), nil
 }
 
+// ProcessDelete deletes gRPC process for the given name
 func (c *InstanceManagerClient) ProcessDelete(name string) error {
 	if _, err := c.grpcClient.ProcessDelete(name); err != nil {
 		return err
@@ -136,6 +146,7 @@ func (c *InstanceManagerClient) ProcessDelete(name string) error {
 	return nil
 }
 
+// ProcessGet retuns the gRPC process for the given name
 func (c *InstanceManagerClient) ProcessGet(name string) (*types.InstanceProcess, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -147,6 +158,7 @@ func (c *InstanceManagerClient) ProcessGet(name string) (*types.InstanceProcess,
 	return c.parseProcess(process), nil
 }
 
+// ProcessLog returns the gRPC LogStream for the given name
 func (c *InstanceManagerClient) ProcessLog(name string) (*imapi.LogStream, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -154,6 +166,7 @@ func (c *InstanceManagerClient) ProcessLog(name string) (*imapi.LogStream, error
 	return c.grpcClient.ProcessLog(name)
 }
 
+// ProcessWatch returns the ProcessStream to monitor process
 func (c *InstanceManagerClient) ProcessWatch() (*imapi.ProcessStream, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -161,6 +174,7 @@ func (c *InstanceManagerClient) ProcessWatch() (*imapi.ProcessStream, error) {
 	return c.grpcClient.ProcessWatch()
 }
 
+// ProcessList returns a single object contains gRPC processes
 func (c *InstanceManagerClient) ProcessList() (map[string]types.InstanceProcess, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -176,6 +190,7 @@ func (c *InstanceManagerClient) ProcessList() (map[string]types.InstanceProcess,
 	return result, nil
 }
 
+// EngineProcessUpgrade replace engine controller gRPC process
 func (c *InstanceManagerClient) EngineProcessUpgrade(engineName, volumeName, engineImage string, volumeFrontend types.VolumeFrontend, replicaAddressMap map[string]string) (*types.InstanceProcess, error) {
 	if err := CheckInstanceManagerCompatibilty(c.apiMinVersion, c.apiVersion); err != nil {
 		return nil, err
@@ -198,6 +213,7 @@ func (c *InstanceManagerClient) EngineProcessUpgrade(engineName, volumeName, eng
 	return c.parseProcess(engineProcess), nil
 }
 
+// VersionGet returns gRPC instance manager version and the minimum version
 func (c *InstanceManagerClient) VersionGet() (int, int, error) {
 	output, err := c.grpcClient.VersionGet()
 	if err != nil {

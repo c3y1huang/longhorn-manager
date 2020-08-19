@@ -15,6 +15,7 @@ import (
 	"github.com/longhorn/longhorn-manager/util"
 )
 
+// BackupTarget object
 type BackupTarget struct {
 	URL        string
 	Image      string
@@ -32,6 +33,7 @@ type backupVolume struct {
 	Backups        map[string]interface{}
 }
 
+// NewBackupTarget creates new BackupTarget object
 func NewBackupTarget(backupTarget, engineImage string, credential map[string]string) *BackupTarget {
 	return &BackupTarget{
 		URL:        backupTarget,
@@ -40,10 +42,12 @@ func NewBackupTarget(backupTarget, engineImage string, credential map[string]str
 	}
 }
 
+// LonghornEngineBinary returns the composed engine binary path on the host for the given image
 func (b *BackupTarget) LonghornEngineBinary() string {
 	return filepath.Join(types.GetEngineBinaryDirectoryOnHostForImage(b.Image), "longhorn")
 }
 
+// ExecuteEngineBinary execute engine binary and arguments with timeout
 func (b *BackupTarget) ExecuteEngineBinary(args ...string) (string, error) {
 	err := util.ConfigBackupCredential(b.URL, b.Credential)
 	if err != nil {
@@ -52,6 +56,7 @@ func (b *BackupTarget) ExecuteEngineBinary(args ...string) (string, error) {
 	return util.Execute(b.LonghornEngineBinary(), args...)
 }
 
+// ExecuteEngineBinaryWithoutTimeout execute engine binary and argument without timeout
 func (b *BackupTarget) ExecuteEngineBinaryWithoutTimeout(args ...string) (string, error) {
 	err := util.ConfigBackupCredential(b.URL, b.Credential)
 	if err != nil {
@@ -130,6 +135,8 @@ func parseOneBackup(output string) (*Backup, error) {
 	return parseBackup(data)
 }
 
+// ListVolumes get list of backup volume with engine binary,
+// returns a single object contains all BackupVolume
 func (b *BackupTarget) ListVolumes() (map[string]*BackupVolume, error) {
 	output, err := b.ExecuteEngineBinary("backup", "ls", "--volume-only", b.URL)
 	if err != nil {
@@ -141,6 +148,8 @@ func (b *BackupTarget) ListVolumes() (map[string]*BackupVolume, error) {
 	return parseBackupVolumesList(output)
 }
 
+// GetVolume gets backup volume for the given name with engine binary,
+// returns BackupVolume object
 func (b *BackupTarget) GetVolume(volumeName string) (*BackupVolume, error) {
 	output, err := b.ExecuteEngineBinary("backup", "ls", "--volume", volumeName, "--volume-only", b.URL)
 	if err != nil {
@@ -156,6 +165,7 @@ func (b *BackupTarget) GetVolume(volumeName string) (*BackupVolume, error) {
 	return list[volumeName], nil
 }
 
+// DeleteVolume deletes backup volume for the given name with engine binary
 func (b *BackupTarget) DeleteVolume(volumeName string) error {
 	_, err := b.ExecuteEngineBinaryWithoutTimeout("backup", "rm", "--volume", volumeName, b.URL)
 	if err != nil {
@@ -167,6 +177,9 @@ func (b *BackupTarget) DeleteVolume(volumeName string) error {
 	}
 	return nil
 }
+
+// List gets a list of backup volumes for given name with engine binary.
+// Returns list of Backup object
 func (b *BackupTarget) List(volumeName string) ([]*Backup, error) {
 	if volumeName == "" {
 		return nil, nil
@@ -181,6 +194,8 @@ func (b *BackupTarget) List(volumeName string) ([]*Backup, error) {
 	return parseBackupsList(output, volumeName)
 }
 
+// GetBackup gets backup for given URL with engine binary.
+// Returns Backup object.
 func (b *BackupTarget) GetBackup(backupURL string) (*Backup, error) {
 	output, err := b.ExecuteEngineBinary("backup", "inspect", backupURL)
 	if err != nil {
@@ -192,6 +207,7 @@ func (b *BackupTarget) GetBackup(backupURL string) (*Backup, error) {
 	return parseOneBackup(output)
 }
 
+// DeleteBackup deletes backup for the given URL with engine binary
 func (b *BackupTarget) DeleteBackup(backupURL string) error {
 	logrus.Infof("Start Deleting backup %s", backupURL)
 	_, err := b.ExecuteEngineBinaryWithoutTimeout("backup", "rm", backupURL)
@@ -206,10 +222,13 @@ func (b *BackupTarget) DeleteBackup(backupURL string) error {
 	return nil
 }
 
+// GetBackupURL returns the composition of the backup URL
 func GetBackupURL(backupTarget, backupName, volName string) string {
 	return fmt.Sprintf("%s?backup=%s&volume=%s", backupTarget, backupName, volName)
 }
 
+// SnapshotBackup creates backup for the given snapshot to the given target with engine
+// binary. Returns backupID
 func (e *Engine) SnapshotBackup(snapName, backupTarget string, labels map[string]string, credential map[string]string) (string, error) {
 	if snapName == VolumeHeadName {
 		return "", fmt.Errorf("invalid operation: cannot backup %v", VolumeHeadName)
@@ -244,6 +263,8 @@ func (e *Engine) SnapshotBackup(snapName, backupTarget string, labels map[string
 	return backupCreateInfo.BackupID, nil
 }
 
+// SnapshotBackupStatus get bakcup status with engine binary, and
+// returns single object contains all BackupStatus 
 func (e *Engine) SnapshotBackupStatus() (map[string]*types.BackupStatus, error) {
 	args := []string{"backup", "status"}
 	output, err := e.ExecuteEngineBinary(args...)
@@ -257,6 +278,7 @@ func (e *Engine) SnapshotBackupStatus() (map[string]*types.BackupStatus, error) 
 	return backups, nil
 }
 
+// BackupRestore restores backup for the composed URL with engine binary
 func (e *Engine) BackupRestore(backupTarget, backupName, backupVolume, lastRestored string, credential map[string]string) error {
 	backup := GetBackupURL(backupTarget, backupName, backupVolume)
 
@@ -285,6 +307,8 @@ func (e *Engine) BackupRestore(backupTarget, backupName, backupVolume, lastResto
 	return nil
 }
 
+// BackupRestoreStatus get backup restore status with engine binary, and 
+// returns single object of all RestoreStatus
 func (e *Engine) BackupRestoreStatus() (map[string]*types.RestoreStatus, error) {
 	args := []string{"backup", "restore-status"}
 	output, err := e.ExecuteEngineBinary(args...)

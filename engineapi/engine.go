@@ -17,8 +17,10 @@ import (
 	"github.com/longhorn/longhorn-manager/util"
 )
 
+// EngineCollection object
 type EngineCollection struct{}
 
+// Engine object
 type Engine struct {
 	name  string
 	image string
@@ -27,6 +29,7 @@ type Engine struct {
 	cURL  string
 }
 
+// NewEngineClient creates a new Engine object
 func (c *EngineCollection) NewEngineClient(request *EngineClientRequest) (EngineClient, error) {
 	if request.EngineImage == "" {
 		return nil, fmt.Errorf("Invalid empty engine image from request")
@@ -43,24 +46,29 @@ func (c *EngineCollection) NewEngineClient(request *EngineClientRequest) (Engine
 	}, nil
 }
 
+// Name returns name from Engine
 func (e *Engine) Name() string {
 	return e.name
 }
 
+// LonghornEngineBinary returns the engine binary path on host for the given image
 func (e *Engine) LonghornEngineBinary() string {
 	return filepath.Join(types.GetEngineBinaryDirectoryOnHostForImage(e.image), "longhorn")
 }
 
+// ExecuteEngineBinary executes engine binary and arguements
 func (e *Engine) ExecuteEngineBinary(args ...string) (string, error) {
 	args = append([]string{"--url", e.cURL}, args...)
 	return util.Execute(e.LonghornEngineBinary(), args...)
 }
 
+// ExecuteEngineBinaryWithTimeout executes engine binary and arguments with timeout
 func (e *Engine) ExecuteEngineBinaryWithTimeout(timeout time.Duration, args ...string) (string, error) {
 	args = append([]string{"--url", e.cURL}, args...)
 	return util.ExecuteWithTimeout(timeout, e.LonghornEngineBinary(), args...)
 }
 
+// ExecuteEngineBinaryWithoutTimeout executes engine binary and arguments without timeout
 func (e *Engine) ExecuteEngineBinaryWithoutTimeout(args ...string) (string, error) {
 	args = append([]string{"--url", e.cURL}, args...)
 	return util.ExecuteWithoutTimeout(e.LonghornEngineBinary(), args...)
@@ -82,6 +90,8 @@ func parseReplica(s string) (*Replica, error) {
 	}, nil
 }
 
+// ReplicaList get replica list with engine binary, and returns
+// single object with all Replica
 func (e *Engine) ReplicaList() (map[string]*Replica, error) {
 	output, err := e.ExecuteEngineBinary("ls")
 	if err != nil {
@@ -105,6 +115,7 @@ func (e *Engine) ReplicaList() (map[string]*Replica, error) {
 	return replicas, nil
 }
 
+// ReplicaAdd adds replica for the given URL with engine binary
 func (e *Engine) ReplicaAdd(url string, isRestoreVolume bool) error {
 	if err := ValidateReplicaURL(url); err != nil {
 		return err
@@ -119,6 +130,7 @@ func (e *Engine) ReplicaAdd(url string, isRestoreVolume bool) error {
 	return nil
 }
 
+// ReplicaRemove removes replica for the given URL with engine binary
 func (e *Engine) ReplicaRemove(url string) error {
 	if err := ValidateReplicaURL(url); err != nil {
 		return err
@@ -129,6 +141,7 @@ func (e *Engine) ReplicaRemove(url string) error {
 	return nil
 }
 
+// Info gets volume info with engine binary, and returns Volume object
 func (e *Engine) Info() (*Volume, error) {
 	output, err := e.ExecuteEngineBinary("info")
 	if err != nil {
@@ -142,6 +155,7 @@ func (e *Engine) Info() (*Volume, error) {
 	return info, nil
 }
 
+// Endpoint returns frontend endpoint URL for the given frontend device type
 func (e *Engine) Endpoint() (string, error) {
 	info, err := e.Info()
 	if err != nil {
@@ -161,6 +175,7 @@ func (e *Engine) Endpoint() (string, error) {
 	return "", fmt.Errorf("Unknown frontend %v", info.Endpoint)
 }
 
+// Version get version with engine binary, and returns an EngineVersion object
 func (e *Engine) Version(clientOnly bool) (*EngineVersion, error) {
 	cmdline := []string{"version"}
 	if clientOnly {
@@ -180,6 +195,7 @@ func (e *Engine) Version(clientOnly bool) (*EngineVersion, error) {
 	return version, nil
 }
 
+// Expand volume for the given size with engine binary
 func (e *Engine) Expand(size int64) error {
 	if _, err := e.ExecuteEngineBinary("expand", "--size", strconv.FormatInt(size, 10)); err != nil {
 		return errors.Wrapf(err, "cannot get expand volume engine to size %v", size)
@@ -188,6 +204,8 @@ func (e *Engine) Expand(size int64) error {
 	return nil
 }
 
+// ReplicaRebuildStatus gets replica rebuild status with engine binary, and
+// returns single object of all RebuildStatus
 func (e *Engine) ReplicaRebuildStatus() (map[string]*types.RebuildStatus, error) {
 	output, err := e.ExecuteEngineBinary("replica-rebuild-status")
 	if err != nil {
@@ -202,6 +220,8 @@ func (e *Engine) ReplicaRebuildStatus() (map[string]*types.RebuildStatus, error)
 	return data, nil
 }
 
+// FrontendStart executes engine binary to start the frontend with the given device
+// type
 func (e *Engine) FrontendStart(volumeFrontend types.VolumeFrontend) error {
 	frontendName, err := GetEngineProcessFrontend(volumeFrontend)
 	if err != nil {
@@ -218,6 +238,7 @@ func (e *Engine) FrontendStart(volumeFrontend types.VolumeFrontend) error {
 	return nil
 }
 
+// FrontendShutdown executes engine binary to shutdown frontend
 func (e *Engine) FrontendShutdown() error {
 	if _, err := e.ExecuteEngineBinary("frontend", "shutdown"); err != nil {
 		return errors.Wrapf(err, "error shutting down the frontend")
@@ -226,6 +247,8 @@ func (e *Engine) FrontendShutdown() error {
 	return nil
 }
 
+// ReplicaRebuildVerify validated the given URL and executes engine binary to
+// verify rebuilding for the replica
 func (e *Engine) ReplicaRebuildVerify(url string) error {
 	if err := ValidateReplicaURL(url); err != nil {
 		return err

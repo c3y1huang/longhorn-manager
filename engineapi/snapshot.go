@@ -15,6 +15,7 @@ const (
 	VolumeHeadName = "volume-head"
 )
 
+// SnapshotCreate creates snapshot with engine binary
 func (e *Engine) SnapshotCreate(name string, labels map[string]string) (string, error) {
 	args := []string{"snapshot", "create"}
 	for k, v := range labels {
@@ -29,6 +30,8 @@ func (e *Engine) SnapshotCreate(name string, labels map[string]string) (string, 
 	return strings.TrimSpace(output), nil
 }
 
+// SnapshotList get snapshot info with engine binary, and
+// returns single object contains all Snapshots
 func (e *Engine) SnapshotList() (map[string]*types.Snapshot, error) {
 	output, err := e.ExecuteEngineBinary("snapshot", "info")
 	if err != nil {
@@ -41,6 +44,7 @@ func (e *Engine) SnapshotList() (map[string]*types.Snapshot, error) {
 	return data, nil
 }
 
+// SnapshotGet returns Snapshot for the given name
 func (e *Engine) SnapshotGet(name string) (*types.Snapshot, error) {
 	data, err := e.SnapshotList()
 	if err != nil {
@@ -49,6 +53,8 @@ func (e *Engine) SnapshotGet(name string) (*types.Snapshot, error) {
 	return data[name], nil
 }
 
+// SnapshotDelete executes engine binary and delete the snapshot for the
+// given name
 func (e *Engine) SnapshotDelete(name string) error {
 	if name == VolumeHeadName {
 		return fmt.Errorf("invalid operation: cannot remove %v", VolumeHeadName)
@@ -59,6 +65,8 @@ func (e *Engine) SnapshotDelete(name string) error {
 	return nil
 }
 
+// SnapshotRevert executes engine binary and revert to snapshot for the
+// given name
 func (e *Engine) SnapshotRevert(name string) error {
 	if name == VolumeHeadName {
 		return fmt.Errorf("invalid operation: cannot revert to %v", VolumeHeadName)
@@ -69,6 +77,7 @@ func (e *Engine) SnapshotRevert(name string) error {
 	return nil
 }
 
+// SnapshotPurge executes engine binary and purge snapshot for the given name.
 func (e *Engine) SnapshotPurge() error {
 	if _, err := e.ExecuteEngineBinaryWithoutTimeout("snapshot", "purge", "--skip-if-in-progress"); err != nil {
 		return errors.Wrapf(err, "error starting snapshot purge")
@@ -77,6 +86,8 @@ func (e *Engine) SnapshotPurge() error {
 	return nil
 }
 
+// SnapshotPurgeStatus executes engine binary and get all snapshot purge status.
+// Returns a single object contains PurgeStatus
 func (e *Engine) SnapshotPurgeStatus() (map[string]*types.PurgeStatus, error) {
 	output, err := e.ExecuteEngineBinary("snapshot", "purge-status")
 	if err != nil {
