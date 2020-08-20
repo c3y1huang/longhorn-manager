@@ -38,14 +38,17 @@ func NewReplicaScheduler(ds *datastore.DataStore) *ReplicaScheduler {
 	return rcScheduler
 }
 
-// ScheduleReplica will return (nil, nil) for unschedulable replica
+// ScheduleReplica gets all schedulable nodes and returns (nil, nil) for unschedulable replica
+// Returns error when:
+// * the given replica NodeID is not empty
+// * no schedulable node found
 func (rcs *ReplicaScheduler) ScheduleReplica(replica *longhorn.Replica, replicas map[string]*longhorn.Replica, volume *longhorn.Volume) (*longhorn.Replica, error) {
 	// only called when replica is starting for the first time
 	if replica.Spec.NodeID != "" {
 		return nil, fmt.Errorf("BUG: Replica %v has been scheduled to node %v", replica.Name, replica.Spec.NodeID)
 	}
 
-	// get all hosts
+	// get all schedulable nodes
 	nodeInfo, err := rcs.getNodeInfo()
 	if err != nil {
 		return nil, err
@@ -180,6 +183,10 @@ func (rcs *ReplicaScheduler) chooseDiskCandidates(nodeInfo map[string]*longhorn.
 	return diskCandidates
 }
 
+// filterNodeDisksForReplica returns a single object contains all Disk with available spaces mapping
+// to its fsid
+// This sums up all the replicas for the disks and calculate and checks for available space on disks
+// on all nodes.
 func (rcs *ReplicaScheduler) filterNodeDisksForReplica(node *longhorn.Node, replica *longhorn.Replica, replicas map[string]*longhorn.Replica, volume *longhorn.Volume) map[string]*Disk {
 	preferredDisk := map[string]*Disk{}
 	// find disk that fit for current replica
@@ -200,6 +207,7 @@ func (rcs *ReplicaScheduler) filterNodeDisksForReplica(node *longhorn.Node, repl
 				storageScheduled += r.Spec.VolumeSize
 			}
 		}
+
 		if storageScheduled > 0 {
 			info.StorageScheduled += storageScheduled
 		}
@@ -223,6 +231,7 @@ func (rcs *ReplicaScheduler) filterNodeDisksForReplica(node *longhorn.Node, repl
 	return preferredDisk
 }
 
+// checkTagsAreFulfilled returns true if the given volumeTags exist in the given itemTags
 func (rcs *ReplicaScheduler) checkTagsAreFulfilled(itemTags, volumeTags []string) bool {
 	if !sort.StringsAreSorted(itemTags) {
 		logrus.Warnf("BUG: Tags are not sorted, sort now")
@@ -238,6 +247,12 @@ func (rcs *ReplicaScheduler) checkTagsAreFulfilled(itemTags, volumeTags []string
 	return true
 }
 
+// getNodeInfo returns an object contains schedulable nodes
+// this checks:
+// * the DeletionTimestamp not nil
+// * the Node condition is ready
+// * the Node condition is schedulable
+// * the Node is allow for scheduling
 func (rcs *ReplicaScheduler) getNodeInfo() (map[string]*longhorn.Node, error) {
 	nodeInfo, err := rcs.ds.ListNodes()
 	if err != nil {
@@ -276,6 +291,11 @@ func (rcs *ReplicaScheduler) scheduleReplicaToDisk(replica *longhorn.Replica, di
 		replica.Name, replica.Spec.NodeID, replica.Spec.DiskID, replica.Spec.DataPath)
 }
 
+// IsSchedulableToDisk returns true if:
+// * the node disk StorageMaximum is not 0
+// * the nod disk have more than 0 available space
+// * the node disk space - used storage is more than the minimum required size
+// * the request size + node disk scheduled less/equal to the desire size after (node disk  - reserverd)
 func (rcs *ReplicaScheduler) IsSchedulableToDisk(size int64, requiredStorage int64, info *DiskSchedulingInfo) bool {
 	// StorageReserved = the space is already used by 3rd party + the space will be used by 3rd party.
 	// StorageAvailable = the space can be used by 3rd party or Longhorn system.
@@ -285,6 +305,8 @@ func (rcs *ReplicaScheduler) IsSchedulableToDisk(size int64, requiredStorage int
 		(size+info.StorageScheduled) <= (info.StorageMaximum-info.StorageReserved)*(info.OverProvisioningPercentage/100)
 }
 
+// GetDiskSchedulingInfo get StorageOverProvisioningPercentage and StorageMinimalAvailablePercentage settings, and
+// returns DiskSchedulingInfo
 func (rcs *ReplicaScheduler) GetDiskSchedulingInfo(disk types.DiskSpec, diskStatus *types.DiskStatus) (*DiskSchedulingInfo, error) {
 	// get StorageOverProvisioningPercentage and StorageMinimalAvailablePercentage settings
 	overProvisioningPercentage, err := rcs.ds.GetSettingAsInt(types.SettingNameStorageOverProvisioningPercentage)
