@@ -29,6 +29,7 @@ type ControllerServer struct {
 	accessModes []*csi.VolumeCapability_AccessMode
 }
 
+// NewControllerServer returns a new ControllerServer for the given RancherClient and nodeID
 func NewControllerServer(apiClient *longhornclient.RancherClient, nodeID string) *ControllerServer {
 	return &ControllerServer{
 		apiClient: apiClient,
@@ -46,6 +47,7 @@ func NewControllerServer(apiClient *longhornclient.RancherClient, nodeID string)
 	}
 }
 
+// CreateVolume creates volume with RancherClient if not exist and returns CreateVolumeResponse
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	logrus.Infof("ControllerServer create volume req: %v", req)
 	if err := cs.validateControllerServiceRequest(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME); err != nil {
@@ -119,6 +121,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}, nil
 }
 
+// DeleteVolume deletes volume and returns a DeleteVolumeResponse
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	logrus.Infof("ControllerServer delete volume req: %v", req)
 
@@ -149,12 +152,16 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
+// ControllerGetCapabilities returns a ControllerGetCapabilitiesResponse with the
+// ControllerServiceCapability in ControllerServer
 func (cs *ControllerServer) ControllerGetCapabilities(ctx context.Context, req *csi.ControllerGetCapabilitiesRequest) (*csi.ControllerGetCapabilitiesResponse, error) {
 	return &csi.ControllerGetCapabilitiesResponse{
 		Capabilities: cs.caps,
 	}, nil
 }
 
+// ValidateVolumeCapabilities validate the given ValidateVolumeCapabilitiesRequest, and
+// returns a Confirmed ValidateVolumeCapabilitiesResponse
 func (cs *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	logrus.Infof("ControllerServer ValidateVolumeCapabilities req: %v", req)
 	if err := cs.validateVolumeCapabilities(req.GetVolumeCapabilities()); err != nil {
@@ -347,6 +354,8 @@ func (cs *ControllerServer) ListSnapshots(context.Context, *csi.ListSnapshotsReq
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// ControllerExpandVolume expend Volume with RancherClient and returns a
+// ControllerExpandVolumeResponse
 func (cs *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	logrus.Infof("ControllerServer ControllerExpandVolume req: %v", req)
 	existVol, err := cs.apiClient.Volume.ById(req.GetVolumeId())
@@ -417,6 +426,9 @@ func (cs *ControllerServer) waitForVolumeState(volumeID string, state types.Volu
 	}
 }
 
+// validateControllerServiceRequest returns error if the given ControllerServiceCapability_RPC_Type
+// is not ControllerServiceCapability_RPC_UNKNOWN or any of the ControllerServer ControllerServiceCapability
+// type
 func (cs *ControllerServer) validateControllerServiceRequest(c csi.ControllerServiceCapability_RPC_Type) error {
 	if c == csi.ControllerServiceCapability_RPC_UNKNOWN {
 		return nil
@@ -430,6 +442,11 @@ func (cs *ControllerServer) validateControllerServiceRequest(c csi.ControllerSer
 	return status.Errorf(codes.InvalidArgument, "unsupported capability %s", c)
 }
 
+// validateVolumeCapabilities validates the VolumeCapability against the ControllerServer
+// Returns error when:
+// * the given volumeCapability does not have mount of block access type
+// * the given volumeCapability have both mount and block access type
+// * the given volumeCapability does not match ControllerServer accessMode
 func (cs *ControllerServer) validateVolumeCapabilities(volumeCaps []*csi.VolumeCapability) error {
 	if volumeCaps == nil {
 		return status.Error(codes.InvalidArgument, "Volume Capabilities cannot be empty")

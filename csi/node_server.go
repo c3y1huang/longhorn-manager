@@ -15,12 +15,16 @@ import (
 	"github.com/longhorn/longhorn-manager/types"
 )
 
+// NodeServer object contains
+// RancherClient, nodeID and
+// service capability
 type NodeServer struct {
 	apiClient *longhornclient.RancherClient
 	nodeID    string
 	caps      []*csi.NodeServiceCapability
 }
 
+// NewNodeServer returns a new NodeServer
 func NewNodeServer(apiClient *longhornclient.RancherClient, nodeID string) *NodeServer {
 	return &NodeServer{
 		apiClient: apiClient,
@@ -32,7 +36,16 @@ func NewNodeServer(apiClient *longhornclient.RancherClient, nodeID string) *Node
 	}
 }
 
-// NodePublishVolume will mount the volume /dev/longhorn/<volume_name> to target_path
+// NodePublishVolume will mount the volume /dev/longhorn/<volume_name> to target_path.
+// This will format the device if the given request volume capability is mount and not
+// match the requested fstype.
+// Returns error when:
+// * the existing volume has more than one controllers
+// * the existing volume state is not attached
+// * the existing volume frontend is disabled
+// * the existing volume frontend type is not blockdev
+// * the existing volume controller has no endpoint
+// * the existing volume is not ready
 func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	logrus.Infof("NodeServer NodePublishVolume req: %v", req)
 
@@ -100,6 +113,10 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	return nil, status.Error(codes.InvalidArgument, "Invalid volume capability, neither Mount nor Block")
 }
 
+// nodePublishMountVolume mounts the given device path to the given target path
+// using fsck, mkfs, mount, and returns a new csi.NodePublishVolumeResponse object
+// if successfully mounted.
+// Returns error when the given target path is already mounted
 func (ns *NodeServer) nodePublishMountVolume(volumeName, devicePath, targetPath, fsType string, mountFlags []string, mounter *mount.SafeFormatAndMount) (*csi.NodePublishVolumeResponse, error) {
 	// It's used to check if a directory is a mount point and it will create the directory if not exist. Hence this target path cannot be used for block volume.
 	notMnt, err := isLikelyNotMountPointAttach(targetPath)
@@ -119,6 +136,13 @@ func (ns *NodeServer) nodePublishMountVolume(volumeName, devicePath, targetPath,
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
+// nodePublishBlockVolume mounts the device to the given namespace
+// path, and returns a new empty csi.NodePublishVolumeResponse if 
+// successfully mounted.
+// It does:
+// * mount to host targetDir namespace if exist or create new
+// * create empty targetPath in the targetDir namespace
+// * mount the existing device path to the targetPath
 func (ns *NodeServer) nodePublishBlockVolume(volumeName, devicePath, targetPath string, mounter *mount.SafeFormatAndMount) (*csi.NodePublishVolumeResponse, error) {
 	targetDir := filepath.Dir(targetPath)
 	exists, err := mounter.ExistsPath(targetDir)
@@ -145,6 +169,9 @@ func (ns *NodeServer) nodePublishBlockVolume(volumeName, devicePath, targetPath 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
+// NodeUnpublishVolume execute unmount or use os.remove for the
+// requested target path. Returns error when the given request 
+// target path is not a mount point
 func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	logrus.Infof("NodeServer NodeUnpublishVolume req: %v", req)
 
@@ -181,6 +208,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
+// NodeStageVolume not implemented
 func (ns *NodeServer) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest) (
@@ -189,6 +217,7 @@ func (ns *NodeServer) NodeStageVolume(
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// NodeUnstageVolume not implemented
 func (ns *NodeServer) NodeUnstageVolume(
 	ctx context.Context,
 	req *csi.NodeUnstageVolumeRequest) (
@@ -197,6 +226,7 @@ func (ns *NodeServer) NodeUnstageVolume(
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// NodeGetVolumeStats not implemented
 func (ns *NodeServer) NodeGetVolumeStats(ctx context.Context, in *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "")
 }
@@ -207,18 +237,23 @@ func (ns *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	return nil, status.Errorf(codes.Unimplemented, "")
 }
 
+// NodeGetInfo returns a new csi.NodeGetInfoResponse object
 func (ns *NodeServer) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	return &csi.NodeGetInfoResponse{
 		NodeId: ns.nodeID,
 	}, nil
 }
 
+// NodeGetCapabilities returns a new csi.NodeGetCapabilitiesResponse
+// object
 func (ns *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: ns.caps,
 	}, nil
 }
 
+// getNodeServiceCapabilities returns a list of csi.NodeServiceCapability
+// for the given csi.NodeServiceCapability_RPC_Type
 func getNodeServiceCapabilities(cs []csi.NodeServiceCapability_RPC_Type) []*csi.NodeServiceCapability {
 	var nscs []*csi.NodeServiceCapability
 

@@ -52,6 +52,8 @@ type AttacherDeployment struct {
 	deployment *appsv1.Deployment
 }
 
+// NewAttacherDeployment returns a new AttacherDeployment object contains
+// Service and Deployment resource
 func NewAttacherDeployment(namespace, serviceAccount, attacherImage, rootDir string, replicaCount int, tolerations []v1.Toleration, priorityClass, registrySecret string) *AttacherDeployment {
 	service := getCommonService(types.CSIAttacherName, namespace)
 
@@ -79,6 +81,8 @@ func NewAttacherDeployment(namespace, serviceAccount, attacherImage, rootDir str
 	}
 }
 
+// Deploy attacher Service and Deployment resources with the Kubernetes
+// client API
 func (a *AttacherDeployment) Deploy(kubeClient *clientset.Clientset) error {
 	if err := deploy(kubeClient, a.service, "service",
 		serviceCreateFunc, serviceDeleteFunc, serviceGetFunc); err != nil {
@@ -89,6 +93,9 @@ func (a *AttacherDeployment) Deploy(kubeClient *clientset.Clientset) error {
 		deploymentCreateFunc, deploymentDeleteFunc, deploymentGetFunc)
 }
 
+// Cleanup remove the Service resource and Deployment resource for the
+// AttacherDeployment object with the Kubernetes client API. The cleanup
+// runs async
 func (a *AttacherDeployment) Cleanup(kubeClient *clientset.Clientset) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -112,6 +119,8 @@ type ProvisionerDeployment struct {
 	deployment *appsv1.Deployment
 }
 
+// NewProvisionerDeployment returns a new ProvisionerDeployment object contains
+// Service and Deployment resource
 func NewProvisionerDeployment(namespace, serviceAccount, provisionerImage, rootDir string, replicaCount int, tolerations []v1.Toleration, priorityClass, registrySecret string) *ProvisionerDeployment {
 	service := getCommonService(types.CSIProvisionerName, namespace)
 
@@ -140,6 +149,7 @@ func NewProvisionerDeployment(namespace, serviceAccount, provisionerImage, rootD
 	}
 }
 
+// Deploy provisioner Service and Deployment resources
 func (p *ProvisionerDeployment) Deploy(kubeClient *clientset.Clientset) error {
 	if err := deploy(kubeClient, p.service, "service",
 		serviceCreateFunc, serviceDeleteFunc, serviceGetFunc); err != nil {
@@ -150,6 +160,9 @@ func (p *ProvisionerDeployment) Deploy(kubeClient *clientset.Clientset) error {
 		deploymentCreateFunc, deploymentDeleteFunc, deploymentGetFunc)
 }
 
+// Cleanup remove the Service resource and Deployment resource for the
+// ProvisionerDeployment object with the Kuberentes client API. The cleanup 
+// runs async
 func (p *ProvisionerDeployment) Cleanup(kubeClient *clientset.Clientset) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -173,6 +186,8 @@ type ResizerDeployment struct {
 	deployment *appsv1.Deployment
 }
 
+// NewResizerDeployment returns ResizerDeployment object contains Service and
+// Deployment resource
 func NewResizerDeployment(namespace, serviceAccount, resizerImage, rootDir string, replicaCount int, tolerations []v1.Toleration, priorityClass, registrySecret string) *ResizerDeployment {
 	service := getCommonService(types.CSIResizerName, namespace)
 
@@ -200,6 +215,7 @@ func NewResizerDeployment(namespace, serviceAccount, resizerImage, rootDir strin
 	}
 }
 
+// Deploy resizer Service and Deployment resources
 func (p *ResizerDeployment) Deploy(kubeClient *clientset.Clientset) error {
 	if err := deploy(kubeClient, p.service, "service",
 		serviceCreateFunc, serviceDeleteFunc, serviceGetFunc); err != nil {
@@ -210,6 +226,9 @@ func (p *ResizerDeployment) Deploy(kubeClient *clientset.Clientset) error {
 		deploymentCreateFunc, deploymentDeleteFunc, deploymentGetFunc)
 }
 
+// Cleanup remove the Service resource and Deployment resource for the
+// ResizerDeployment object with the Kuberentes client API. The cleanup
+// runs async
 func (p *ResizerDeployment) Cleanup(kubeClient *clientset.Clientset) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
@@ -232,6 +251,8 @@ type PluginDeployment struct {
 	daemonSet *appsv1.DaemonSet
 }
 
+// NewPluginDeployment returns new PluginDeployment object contains
+// Daemonset resource
 func NewPluginDeployment(namespace, serviceAccount, nodeDriverRegistrarImage, managerImage, managerURL, rootDir string, tolerations []v1.Toleration, priorityClass, registrySecret string) *PluginDeployment {
 	daemonSet := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -451,11 +472,14 @@ func NewPluginDeployment(namespace, serviceAccount, nodeDriverRegistrarImage, ma
 	}
 }
 
+// Deploy plugin DaemonSet resource
 func (p *PluginDeployment) Deploy(kubeClient *clientset.Clientset) error {
 	return deploy(kubeClient, p.daemonSet, "daemon set",
 		daemonSetCreateFunc, daemonSetDeleteFunc, daemonSetGetFunc)
 }
 
+// Cleanup remove the DaemonSet resource for the
+// PluginDeployment object with the Kuberentes client API.
 func (p *PluginDeployment) Cleanup(kubeClient *clientset.Clientset) {
 	if err := cleanup(kubeClient, p.daemonSet, "daemon set",
 		daemonSetDeleteFunc, daemonSetGetFunc); err != nil {
@@ -467,6 +491,8 @@ type DriverObjectDeployment struct {
 	obj *storagev1beta.CSIDriver
 }
 
+// NewCSIDriverObject returns DriverObjectDeployment
+// object contains Object resource
 func NewCSIDriverObject() *DriverObjectDeployment {
 	falseFlag := false
 	obj := &storagev1beta.CSIDriver{
@@ -482,11 +508,14 @@ func NewCSIDriverObject() *DriverObjectDeployment {
 	}
 }
 
+// Deploy driver Object resource
 func (d *DriverObjectDeployment) Deploy(kubeClient *clientset.Clientset) error {
 	return deploy(kubeClient, d.obj, "CSI Driver",
 		csiDriverObjectCreateFunc, csiDriverObjectDeleteFunc, csiDriverObjectGetFunc)
 }
 
+// Cleanup remove the Object resource for the
+// DriverObjectDeployment object with the Kuberentes client API.
 func (d *DriverObjectDeployment) Cleanup(kubeClient *clientset.Clientset) {
 	if err := cleanup(kubeClient, d.obj, "CSI Driver",
 		csiDriverObjectDeleteFunc, csiDriverObjectGetFunc); err != nil {

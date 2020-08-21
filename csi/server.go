@@ -32,15 +32,20 @@ import (
 	"google.golang.org/grpc"
 )
 
+// NewNonBlockingGRPCServer returns a new NonBlockingGRPCServer
 func NewNonBlockingGRPCServer() *NonBlockingGRPCServer {
 	return &NonBlockingGRPCServer{}
 }
 
+// NonBlockingGRPCServer object contains
+// the go routine WaitGroup and the gRPC
+// server object
 type NonBlockingGRPCServer struct {
 	wg     sync.WaitGroup
 	server *grpc.Server
 }
 
+// Start gRPC server for identity, controller, node server
 func (s *NonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 
 	s.wg.Add(1)
@@ -50,18 +55,24 @@ func (s *NonBlockingGRPCServer) Start(endpoint string, ids csi.IdentityServer, c
 	return
 }
 
+// Wait for NonBlockingGRPCServe go routing
 func (s *NonBlockingGRPCServer) Wait() {
 	s.wg.Wait()
 }
 
+// Stop calls GracefulStop for NonBlockingGRPCServe
+// go routing
 func (s *NonBlockingGRPCServer) Stop() {
 	s.server.GracefulStop()
 }
 
+// ForceStop for NonBlockingGRPCServe go routing
 func (s *NonBlockingGRPCServer) ForceStop() {
 	s.server.Stop()
 }
 
+// serve register and serves identity, controller, node server for the
+// given endpoint.
 func (s *NonBlockingGRPCServer) serve(endpoint string, ids csi.IdentityServer, cs csi.ControllerServer, ns csi.NodeServer) {
 
 	proto, addr, err := parseEndpoint(endpoint)

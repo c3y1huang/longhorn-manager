@@ -7,6 +7,8 @@ import (
 	longhornclient "github.com/longhorn/longhorn-manager/client"
 )
 
+// Manager object contains
+// all CSI servers object
 type Manager struct {
 	ids *IdentityServer
 	ns  *NodeServer
@@ -15,10 +17,14 @@ type Manager struct {
 
 func init() {}
 
+// GetCSIManager returns a new
+// Manager object
 func GetCSIManager() *Manager {
 	return &Manager{}
 }
 
+// Run starts a new gRPC server that registers the IdentityServer, NodeServer, and ControllerServer.
+// The NodeServer and ControllerServer contains RancherClient
 func (m *Manager) Run(driverName, nodeID, endpoint, csiVersion, identityVersion, managerURL string) error {
 	logrus.Infof("CSI Driver: %v csiVersion: %v", driverName, csiVersion)
 

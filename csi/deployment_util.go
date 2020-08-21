@@ -30,6 +30,8 @@ const (
 	maxRetryForDeletion                   = 120
 )
 
+// getCommonService returns new Service with the given name and namespace.
+// This also includes a dummy ServicePort
 func getCommonService(commonName, namespace string) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -53,6 +55,7 @@ func getCommonService(commonName, namespace string) *v1.Service {
 	}
 }
 
+// getCommonDeployment returns a new Deployment object
 func getCommonDeployment(commonName, namespace, serviceAccount, image, rootDir string, args []string, replicaCount int32, tolerations []v1.Toleration, priorityClass, registrySecret string) *appsv1.Deployment {
 	labels := map[string]string{
 		"app": commonName,
@@ -148,6 +151,8 @@ func waitForDeletion(kubeClient *clientset.Clientset, name, namespace, resource 
 	return fmt.Errorf("Foreground deletion of %s %s timed out", resource, name)
 }
 
+// given object if then CSI and Kubernetes version not matching existing
+// deploy deletes existing deployment and re-create a new deployment for the
 func deploy(kubeClient *clientset.Clientset, obj runtime.Object, resource string,
 	createFunc resourceCreateFunc, deleteFunc resourceDeleteFunc, getFunc resourceGetFunc) (err error) {
 
@@ -203,6 +208,8 @@ func deploy(kubeClient *clientset.Clientset, obj runtime.Object, resource string
 	return nil
 }
 
+// cleanup remove the given resource with the given deleteFunc using Kuberentes
+// client API
 func cleanup(kubeClient *clientset.Clientset, obj runtime.Object, resource string,
 	deleteFunc resourceDeleteFunc, getFunc resourceGetFunc) (err error) {
 
@@ -239,6 +246,7 @@ func cleanup(kubeClient *clientset.Clientset, obj runtime.Object, resource strin
 	return waitForDeletion(kubeClient, name, namespace, resource, getFunc)
 }
 
+// serviceCreateFunc creates a Service resource for the given object
 func serviceCreateFunc(kubeClient *clientset.Clientset, obj runtime.Object) error {
 	o, ok := obj.(*v1.Service)
 	if !ok {
@@ -248,6 +256,7 @@ func serviceCreateFunc(kubeClient *clientset.Clientset, obj runtime.Object) erro
 	return err
 }
 
+// serviceDeleteFunc deletes a Service resource for the given name and namespace
 func serviceDeleteFunc(kubeClient *clientset.Clientset, name, namespace string) error {
 	propagation := metav1.DeletePropagationForeground
 	return kubeClient.CoreV1().Services(namespace).Delete(
@@ -354,50 +363,73 @@ func CheckMountPropagationWithNode(managerURL string) error {
 	return nil
 }
 
+// GetInContainerCSISocketDir returns the default in
+// container CSI socket directory
 func GetInContainerCSISocketDir() string {
 	return DefaultInContainerCSISocketDir
 }
 
+// GetInContainerCSISocketFilePath compose the default
+// path of the in container CSI socket file
 func GetInContainerCSISocketFilePath() string {
 	return filepath.Join(GetInContainerCSISocketDir(), DefaultCSISocketFileName)
 }
 
+// GetInContainerCSIRegistrationDir returns the default
+// in container CSI registration directory
 func GetInContainerCSIRegistrationDir() string {
 	return DefaultInContainerCSIRegistrationDir
 }
 
+// GetInContainerPluginsDir compose the default
+// in container plugin directory
 func GetInContainerPluginsDir() string {
 	return filepath.Join(DefaultInContainerKubeletRootDir, DefaultInContainerPluginsDirSuffix)
 }
 
+// GetInContainerKubernetesCSIDir compose the default
+// in container Kuberenetes CSI directory
 func GetInContainerKubernetesCSIDir() string {
 	return filepath.Join(DefaultInContainerKubeletRootDir, DefaultInContainerPluginsDirSuffix, DefaultKubernetesCSIDirSuffix)
 }
 
+// GetOnHostKubernetesCSIDir compose the default on
+// host Kubernetes CSI directory
 func GetOnHostKubernetesCSIDir(kubeletRootDir string) string {
 	return filepath.Join(kubeletRootDir, DefaultOnHostPluginsDirSuffix, DefaultKubernetesCSIDirSuffix)
 }
 
+// GetOnHostCSISocketDir compose the default on host
+// obsolete CSI driver directory
 func GetOnHostCSISocketDir(kubeletRootDir string) string {
 	return filepath.Join(GetOnHostObseletedPluginsDir(kubeletRootDir), types.LonghornDriverName)
 }
 
+// GetOnHostCSISocketFilePath compose the default on host
+// obsolete CSI socket path
 func GetOnHostCSISocketFilePath(kubeletRootDir string) string {
 	return filepath.Join(GetOnHostCSISocketDir(kubeletRootDir), DefaultCSISocketFileName)
 }
 
+// GetOnHostCSIRegistrationDir compose the default on host
+// CSI registration directory
 func GetOnHostCSIRegistrationDir(kubeletRootDir string) string {
 	return filepath.Join(kubeletRootDir, DefaultOnHostCSIRegistrationDirSuffix)
 }
 
+// GetOnHostPluginsDir compose the default on host plugin
+// directory
 func GetOnHostPluginsDir(kubeletRootDir string) string {
 	return filepath.Join(kubeletRootDir, DefaultOnHostPluginsDirSuffix)
 }
 
+// GetOnHostObseletedPluginsDir compose the default on host
+// obsolete plugin directory
 func GetOnHostObseletedPluginsDir(kubeletRootDir string) string {
 	return filepath.Join(kubeletRootDir, DefaultOnHostObseletedPluginsDirSuffix)
 }
 
+// GetCSIEndpoint compose the CSI unix end point URL
 func GetCSIEndpoint() string {
 	return "unix://" + GetInContainerCSISocketFilePath()
 }

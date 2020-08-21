@@ -44,6 +44,7 @@ func (e *forcedParamsOsExec) Run(cmd string, args ...string) ([]byte, error) {
 	return e.osExec.Run(cmd, params...)
 }
 
+// getVolumeOptions returns *longhornclient.Volume for the given volume options
 func getVolumeOptions(volOptions map[string]string) (*longhornclient.Volume, error) {
 	vol := &longhornclient.Volume{}
 
@@ -107,6 +108,9 @@ func parseJSONRecurringJobs(jsonRecurringJobs string) ([]longhornclient.Recurrin
 	return recurringJobs, nil
 }
 
+// isLikelyNotMountPointAttach returns false if the given path
+// is not a mount point.
+// This also creates file if the given path not exist
 func isLikelyNotMountPointAttach(targetpath string) (bool, error) {
 	notMnt, err := mount.New("").IsLikelyNotMountPoint(targetpath)
 	if err != nil {
@@ -120,6 +124,9 @@ func isLikelyNotMountPointAttach(targetpath string) (bool, error) {
 	return notMnt, err
 }
 
+// isLikelyNotMountPointDetach returns true if the given path device
+// directory is same as the parent directory or returns error when
+// the path not exist
 func isLikelyNotMountPointDetach(targetpath string) (bool, error) {
 	notMnt, err := mount.New("").IsLikelyNotMountPoint(targetpath)
 	if err != nil {
