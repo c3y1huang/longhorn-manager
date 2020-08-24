@@ -145,6 +145,8 @@ func NewEngineImageController(
 	return ic
 }
 
+// Run wait for the EngineImageController to be ready, and
+// start an infinite loop of the cached queue worker
 func (ic *EngineImageController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ic.queue.ShutDown()
@@ -163,11 +165,13 @@ func (ic *EngineImageController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// worker starts an inifinit loop of the queue worker
 func (ic *EngineImageController) worker() {
 	for ic.processNextWorkItem() {
 	}
 }
 
+// processNextWorkItem syncs EngineImage with the cached queue
 func (ic *EngineImageController) processNextWorkItem() bool {
 	key, quit := ic.queue.Get()
 
@@ -199,10 +203,12 @@ func (ic *EngineImageController) handleErr(err error, key interface{}) {
 	ic.queue.Forget(key)
 }
 
+// syncEngineImage
 func (ic *EngineImageController) syncEngineImage(key string) (err error) {
 	defer func() {
 		err = errors.Wrapf(err, "fail to sync engine image for %v", key)
 	}()
+	
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err

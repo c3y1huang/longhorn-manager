@@ -157,6 +157,8 @@ func NewEngineController(
 	return ec
 }
 
+// Run waits for engineController and instanceManager datastore cache synced, then
+// starts an infinite loop to process engineController queue in cache
 func (ec *EngineController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ec.queue.ShutDown()
@@ -175,11 +177,14 @@ func (ec *EngineController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// worker starts and inifinite look to proceess
+// EngineController queue in cache
 func (ec *EngineController) worker() {
 	for ec.processNextWorkItem() {
 	}
 }
 
+// processNextWorkItem 
 func (ec *EngineController) processNextWorkItem() bool {
 	key, quit := ec.queue.Get()
 
@@ -211,6 +216,13 @@ func (ec *EngineController) handleErr(err error, key interface{}) {
 	ec.queue.Forget(key)
 }
 
+// syncEngine 
+// * get namepace and name for the given queue key
+// * get engine fron cache
+// * update engine status in cache
+// * delete engine resource if the DeleteTimestamp exist
+// * upgrade engine if current not match the desired
+// * updates EngineController with instanceManager in cache
 func (ec *EngineController) syncEngine(key string) (err error) {
 	defer func() {
 		err = errors.Wrapf(err, "fail to sync engine for %v", key)
@@ -381,6 +393,8 @@ func (ec *EngineController) CreateInstance(obj interface{}) (*types.InstanceProc
 	return c.EngineProcessCreate(e.Name, e.Spec.VolumeName, e.Spec.EngineImage, frontend, e.Status.CurrentReplicaAddressMap)
 }
 
+// DeleteInstance deletes engine Pod resource and delete engine 
+// gRPC process with instanceManager client 
 func (ec *EngineController) DeleteInstance(obj interface{}) error {
 	e, ok := obj.(*longhorn.Engine)
 	if !ok {
@@ -557,6 +571,7 @@ func (ec *EngineController) isMonitoring(e *longhorn.Engine) bool {
 	return ok
 }
 
+// startMonitoring starts 
 func (ec *EngineController) startMonitoring(e *longhorn.Engine) {
 	stopCh := make(chan struct{})
 	monitor := &EngineMonitor{
@@ -604,6 +619,7 @@ func (ec *EngineController) stopMonitoring(e *longhorn.Engine) {
 	return
 }
 
+// Run starts 
 func (m *EngineMonitor) Run() {
 	logrus.Debugf("Start monitoring %v", m.Name)
 	defer logrus.Debugf("Stop monitoring %v", m.Name)
@@ -632,6 +648,9 @@ func (m *EngineMonitor) stop(e *longhorn.Engine) {
 	}
 }
 
+// sync
+// * get engine from cache
+// * 
 func (m *EngineMonitor) sync() bool {
 	for count := 0; count < EngineMonitorConflictRetryCount; count++ {
 		engine, err := m.ds.GetEngine(m.Name)
@@ -673,6 +692,21 @@ func (m *EngineMonitor) sync() bool {
 	return false
 }
 
+// refresh 
+// * get new Engine client object
+// * get Replica object with engine binary
+// * convert to tcp:// URL
+// * check replica mode
+// * check snapshot list (not implemented)
+// * get engine image version
+// * update frontend endpoint
+// * update expandsion status
+// * update replica rebuild status
+// * update snapshot backup status
+// * update snapshot purge status
+// * update engine status with lhclient
+// Returns error when:
+// * deplicated replica address
 func (m *EngineMonitor) refresh(engine *longhorn.Engine) error {
 	existingEngine := engine.DeepCopy()
 
@@ -862,6 +896,7 @@ func (m *EngineMonitor) refresh(engine *longhorn.Engine) error {
 	return nil
 }
 
+// preRestoreCheckAndSync
 func preRestoreCheckAndSync(engine *longhorn.Engine, rsMap map[string]*types.RestoreStatus, addressReplicaMap map[string]string, cliAPIVersion int, client engineapi.EngineClient, ds *datastore.DataStore) (needRestore bool, err error) {
 	defer func() {
 		if err != nil {
@@ -900,6 +935,7 @@ func preRestoreCheckAndSync(engine *longhorn.Engine, rsMap map[string]*types.Res
 	return true, nil
 }
 
+// syncWithRestoreStatus 
 func syncWithRestoreStatus(engine *longhorn.Engine, rsMap map[string]*types.RestoreStatus, addressReplicaMap map[string]string, client engineapi.EngineClient) bool {
 	for _, status := range engine.Status.PurgeStatus {
 		if status.IsPurging {
@@ -959,6 +995,7 @@ func syncWithRestoreStatus(engine *longhorn.Engine, rsMap map[string]*types.Rest
 	return false
 }
 
+// syncWithRestoreStatusForCompatibleEngine update last restore backup to the engine status
 func syncWithRestoreStatusForCompatibleEngine(engine *longhorn.Engine, rsMap map[string]*types.RestoreStatus) (bool, bool) {
 	isRestoring := false
 	isConsensual := true
@@ -968,7 +1005,7 @@ func syncWithRestoreStatusForCompatibleEngine(engine *longhorn.Engine, rsMap map
 			isRestoring = true
 		}
 	}
-	// Engine is not restoring, pick the lastRestored from replica then update LastRestoredBackup
+	// Engine is not restoring, pick the lastRestored from restore status then update LastRestoredBackup
 	if !isRestoring {
 		for addr, status := range rsMap {
 			if lastRestored != "" && status.LastRestored != lastRestored {
@@ -1112,6 +1149,7 @@ func (ec *EngineController) ReconcileEngineState(e *longhorn.Engine) error {
 	return nil
 }
 
+// GetClientForEngine returns a new EngineClient object
 func GetClientForEngine(e *longhorn.Engine, engines engineapi.EngineClientCollection, image string) (client engineapi.EngineClient, err error) {
 	defer func() {
 		err = errors.Wrapf(err, "cannot get client for engine %v", e.Name)
@@ -1292,6 +1330,8 @@ func (ec *EngineController) startRebuilding(e *longhorn.Engine, replica, addr st
 	return nil
 }
 
+// Upgrade Engine with engine binary for the given object and update
+// object status
 func (ec *EngineController) Upgrade(e *longhorn.Engine) (err error) {
 	defer func() {
 		err = errors.Wrapf(err, "cannot live upgrade image for %v", e.Name)
@@ -1325,6 +1365,7 @@ func (ec *EngineController) Upgrade(e *longhorn.Engine) (err error) {
 	return nil
 }
 
+// UpgradeEngineProcess upgrade with engine binary on new instance manager client
 func (ec *EngineController) UpgradeEngineProcess(e *longhorn.Engine) error {
 	frontend := e.Spec.Frontend
 	if e.Spec.DisableFrontend {

@@ -43,6 +43,7 @@ func NewInstanceHandler(ds *datastore.DataStore, instanceManagerHandler Instance
 	}
 }
 
+// syncStatusWithInstanceManager update resource InstanceStatus object with the InstanceManager.CurrentState
 func (h *InstanceHandler) syncStatusWithInstanceManager(im *longhorn.InstanceManager, instanceName string, spec *types.InstanceSpec, status *types.InstanceStatus) {
 	defer func() {
 		if status.CurrentState == types.InstanceStateStopped {
@@ -163,6 +164,8 @@ func (h *InstanceHandler) getNameFromObj(obj runtime.Object) (string, error) {
 	return metadata.GetName(), nil
 }
 
+// ReconcileInstanceState create or delete gRPC client for the given desire state,
+// then sync the resource instance status with the instance manager status in cache
 func (h *InstanceHandler) ReconcileInstanceState(obj interface{}, spec *types.InstanceSpec, status *types.InstanceStatus) (err error) {
 	runtimeObj, ok := obj.(runtime.Object)
 	if !ok {
@@ -320,6 +323,7 @@ func (h *InstanceHandler) printInstanceLogs(instanceName string, obj runtime.Obj
 	return nil
 }
 
+// createInstance creates new gRPC client runs with engine binary - replica 
 func (h *InstanceHandler) createInstance(instanceName string, obj runtime.Object) error {
 	_, err := h.instanceManagerHandler.GetInstance(obj)
 	if err == nil {
@@ -344,6 +348,8 @@ func (h *InstanceHandler) createInstance(instanceName string, obj runtime.Object
 	return nil
 }
 
+// deleteInstance deletes gRPC process from instanceManager and record event to control
+// plane
 func (h *InstanceHandler) deleteInstance(instanceName string, obj runtime.Object) error {
 	// May try to force deleting instances on lost node. Don't need to check the instance
 	logrus.Debugf("Prepare to delete instance %v", instanceName)

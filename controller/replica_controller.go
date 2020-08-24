@@ -125,6 +125,8 @@ func NewReplicaController(
 	return rc
 }
 
+// Run wait for replica controller and instance manager informers cache to sync,
+// then runs start an infinite loop to proceess replica queue in cache
 func (rc *ReplicaController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rc.queue.ShutDown()
@@ -143,11 +145,14 @@ func (rc *ReplicaController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
+// worker runs infinite loop to process queue in replica cache
 func (rc *ReplicaController) worker() {
 	for rc.processNextWorkItem() {
 	}
 }
 
+// processNextWorkItem sync replica instance manager for the replica in
+// cached queue
 func (rc *ReplicaController) processNextWorkItem() bool {
 	key, quit := rc.queue.Get()
 
@@ -162,6 +167,7 @@ func (rc *ReplicaController) processNextWorkItem() bool {
 	return true
 }
 
+// handleErr adds replica queue back to the queue until exceeds maxRetries
 func (rc *ReplicaController) handleErr(err error, key interface{}) {
 	if err == nil {
 		rc.queue.Forget(key)
@@ -179,6 +185,16 @@ func (rc *ReplicaController) handleErr(err error, key interface{}) {
 	rc.queue.Forget(key)
 }
 
+// syncReplica
+// get replica namespace and name for the given queue key
+// get replica in informer cache from the cache meta
+// checks if controller is responsible for the replica
+// update replica status in informer cachein informer cach
+// if timestampe delete exist:
+// * delete replica process from instance manager
+// * clean up replica container namespace data path
+// * remove finalizer from replica
+// * then update the replica instance status with the instance manager status
 func (rc *ReplicaController) syncReplica(key string) (err error) {
 	defer func() {
 		err = errors.Wrapf(err, "fail to sync replica for %v", key)
@@ -283,6 +299,7 @@ func (rc *ReplicaController) getProcessManagerClient(instanceManagerName string)
 	return imclient.NewProcessManagerClient(imutil.GetURL(im.Status.IP, engineapi.InstanceManagerDefaultPort)), nil
 }
 
+// CreateInstance creates new InstaceManager gRPC client that runs replica with engine binary
 func (rc *ReplicaController) CreateInstance(obj interface{}) (*types.InstanceProcess, error) {
 	r, ok := obj.(*longhorn.Replica)
 	if !ok {
@@ -304,6 +321,11 @@ func (rc *ReplicaController) CreateInstance(obj interface{}) (*types.InstancePro
 	return c.ReplicaProcessCreate(r.Name, r.Spec.EngineImage, r.Spec.DataPath, r.Spec.VolumeSize)
 }
 
+// DeleteInstance delete replica gRPC process from instanceManager
+// * delete replica Pod with EngineImage v1
+// * get replica instance manager
+// * create new instance manager client
+// * delete replica gRPC process
 func (rc *ReplicaController) DeleteInstance(obj interface{}) error {
 	r, ok := obj.(*longhorn.Replica)
 	if !ok {
@@ -358,6 +380,7 @@ func (rc *ReplicaController) DeleteInstance(obj interface{}) error {
 	return nil
 }
 
+// deleteInstanceWithCLIAPIVersionOne delete replica Pod resources with CSI v1 EngineImage
 func (rc *ReplicaController) deleteInstanceWithCLIAPIVersionOne(r *longhorn.Replica) (err error) {
 	isCLIAPIVersionOne := false
 	if r.Status.CurrentImage != "" {
@@ -384,6 +407,8 @@ func (rc *ReplicaController) deleteInstanceWithCLIAPIVersionOne(r *longhorn.Repl
 	return nil
 }
 
+// deleteOldReplicaPod delete the give Pod resource with Kubernetes client API. Thie sets the
+// DeletionTimestamp to now and the gracePeriod to 0
 func (rc *ReplicaController) deleteOldReplicaPod(pod *v1.Pod, r *longhorn.Replica) (err error) {
 	// pod already stopped
 	if pod == nil {
@@ -484,6 +509,8 @@ func (rc *ReplicaController) enqueueInstanceManagerChange(im *longhorn.InstanceM
 	return
 }
 
+// isResponsibleFor checks the informer cache and returns true
+// if the controller is responsible for the given replica
 func (rc *ReplicaController) isResponsibleFor(r *longhorn.Replica) bool {
 	return isControllerResponsibleFor(rc.controllerID, rc.ds, r.Name, r.Spec.NodeID, r.Status.OwnerID)
 }

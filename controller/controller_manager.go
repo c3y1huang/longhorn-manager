@@ -31,6 +31,25 @@ var (
 	longhornFinalizerKey = longhorn.SchemeGroupVersion.Group
 )
 
+// StartControllers
+// get pod namespace from env variable
+// crete kubernetes config object
+// creates kuberntes clientset
+// creates longhorn clientset
+// creates new scheme and add to builder
+// create longhorn shared informer factory
+// create kuberentes shared informer factory
+// create longhorn informer factory resources: replica,
+//   engine, volume, engineImage, node setting and
+//   instanceManager
+// create kubernetes informer factory resources:
+//   pod, node, persistentVolume, persistentVolumeClaim,
+//   cronJob, daemonSet, deployment, volumeAttachement, 
+//   prorityClass 
+// creates new DataStore object with all resource informers
+// stare kubernetes, longhorn informer factory
+// wait for all resource informer to sync cache
+// run all resource informer
 func StartControllers(stopCh chan struct{}, controllerID, serviceAccount, managerImage, kubeconfigPath, version string) (*datastore.DataStore, *WebsocketController, error) {
 	namespace := os.Getenv(types.EnvPodNamespace)
 	if namespace == "" {
@@ -155,6 +174,10 @@ func GetGuaranteedResourceRequirement(ds *datastore.DataStore) (*corev1.Resource
 	}, nil
 }
 
+// isControllerResponsibleFor returns true if:
+// * the preferred node ID is the controller ID
+// * the current owner ID is empty
+// * the current owner node is down or delete
 func isControllerResponsibleFor(controllerID string, ds *datastore.DataStore, name, preferredOwnerID, currentOwnerID string) bool {
 	var err error
 	responsible := false
