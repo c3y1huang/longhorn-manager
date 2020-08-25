@@ -9,6 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// BackupVolumeList get a list of backup volumes with engine
+// binary by request
 func (s *Server) BackupVolumeList(w http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -20,6 +22,8 @@ func (s *Server) BackupVolumeList(w http.ResponseWriter, req *http.Request) erro
 	return nil
 }
 
+// BackupVolumeGet get backup volume with engine binary for
+// the given name from request
 func (s *Server) BackupVolumeGet(w http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -33,6 +37,8 @@ func (s *Server) BackupVolumeGet(w http.ResponseWriter, req *http.Request) error
 	return nil
 }
 
+// BackupVolumeDelete delete backup volume with engine binary
+// for the given name in request
 func (s *Server) BackupVolumeDelete(w http.ResponseWriter, req *http.Request) error {
 	volName := mux.Vars(req)["volName"]
 	if err := s.m.DeleteBackupVolume(volName); err != nil {
@@ -41,6 +47,8 @@ func (s *Server) BackupVolumeDelete(w http.ResponseWriter, req *http.Request) er
 	return nil
 }
 
+// BackupList get a list of backup with engine binary for the
+// given volume name in request
 func (s *Server) BackupList(w http.ResponseWriter, req *http.Request) error {
 	volName := mux.Vars(req)["volName"]
 
@@ -52,6 +60,8 @@ func (s *Server) BackupList(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// BackupGet get the backup with engine binary for the given backup
+// and volume name for the given request
 func (s *Server) BackupGet(w http.ResponseWriter, req *http.Request) error {
 	var input BackupInput
 
@@ -78,6 +88,8 @@ func (s *Server) BackupGet(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// BackupDelete deletes backup with engine binary for the given backup and
+// volume name in request
 func (s *Server) BackupDelete(w http.ResponseWriter, req *http.Request) error {
 	var input BackupInput
 

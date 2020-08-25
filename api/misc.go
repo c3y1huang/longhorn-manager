@@ -14,6 +14,7 @@ import (
 	"github.com/longhorn/longhorn-manager/manager"
 )
 
+// EventList gets longhorn event list for the request
 func (s *Server) EventList(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -25,6 +26,8 @@ func (s *Server) EventList(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// eventList get a list of longhorn events with kubeclient,
+// and returns in *client.GenericCollection Data
 func (s *Server) eventList(apiContext *api.ApiContext) (*client.GenericCollection, error) {
 	eventList, err := s.m.GetLonghornEventList()
 	if err != nil {
@@ -33,6 +36,8 @@ func (s *Server) eventList(apiContext *api.ApiContext) (*client.GenericCollectio
 	return toEventCollection(eventList), nil
 }
 
+// InitiateSupportBundle generates support bundle for the given
+// request
 func (s *Server) InitiateSupportBundle(w http.ResponseWriter, req *http.Request) error {
 	var sb *manager.SupportBundle
 	var supportBundleInput SupportBundleInitateInput
@@ -49,6 +54,8 @@ func (s *Server) InitiateSupportBundle(w http.ResponseWriter, req *http.Request)
 	return nil
 }
 
+// QuerySupportBundle get the support bundle from the cached datastore
+// for the given request
 func (s *Server) QuerySupportBundle(w http.ResponseWriter, req *http.Request) error {
 	bundleName := mux.Vars(req)["bundleName"]
 	apiContext := api.GetApiContext(req)
@@ -60,6 +67,7 @@ func (s *Server) QuerySupportBundle(w http.ResponseWriter, req *http.Request) er
 	return nil
 }
 
+// DownloadSupportBundle returns the support bundle in response stream
 func (s *Server) DownloadSupportBundle(w http.ResponseWriter, req *http.Request) error {
 	bundleName := mux.Vars(req)["bundleName"]
 	sb, err := s.m.GetSupportBundle(bundleName)
@@ -89,6 +97,7 @@ func (s *Server) DownloadSupportBundle(w http.ResponseWriter, req *http.Request)
 	return nil
 }
 
+// DiskTagList get node disk tags in datastore cache for the given request
 func (s *Server) DiskTagList(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -101,6 +110,7 @@ func (s *Server) DiskTagList(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// NodeTagList get node tags in datastore cache for the given request
 func (s *Server) NodeTagList(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -113,6 +123,8 @@ func (s *Server) NodeTagList(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// InstanceManagerGet get the InstanceManager object for the given name in
+// request
 func (s *Server) InstanceManagerGet(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 	apiContext := api.GetApiContext(req)
@@ -126,6 +138,8 @@ func (s *Server) InstanceManagerGet(rw http.ResponseWriter, req *http.Request) e
 	return nil
 }
 
+// InstanceManagerList get a list of instance managers in datastore cache,
+// and respond in *client.GenericCollection Data
 func (s *Server) InstanceManagerList(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 

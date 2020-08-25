@@ -30,6 +30,7 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+// NewStreamHandlerFunc handles data stream for router
 func NewStreamHandlerFunc(streamType string, watcher *controller.Watcher, listFunc func(ctx *api.ApiContext) (*client.GenericCollection, error)) func(w http.ResponseWriter, r *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -92,6 +93,8 @@ func NewStreamHandlerFunc(streamType string, watcher *controller.Watcher, listFu
 	}
 }
 
+// writeList returns client.GenericCollection for the given old
+// and new response
 func writeList(conn *websocket.Conn, oldResp *client.GenericCollection, listFunc func(ctx *api.ApiContext) (*client.GenericCollection, error), apiContext *api.ApiContext) (*client.GenericCollection, error) {
 	newResp, err := listFunc(apiContext)
 	if err != nil {
@@ -115,6 +118,7 @@ func writeList(conn *websocket.Conn, oldResp *client.GenericCollection, listFunc
 	return newResp, nil
 }
 
+// maybeNewTicker returns a new ticker for the given duration
 func maybeNewTicker(d time.Duration) *time.Ticker {
 	var ticker *time.Ticker
 	if d > 0*time.Second {
@@ -123,6 +127,8 @@ func maybeNewTicker(d time.Duration) *time.Ticker {
 	return ticker
 }
 
+// getPeriod returns period as 15 second when the
+// given period in request is not 0 second
 func getPeriod(r *http.Request) time.Duration {
 	period := 0 * time.Second
 	periodString := mux.Vars(r)["period"]

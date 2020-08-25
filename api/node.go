@@ -14,6 +14,8 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// NodeList gets all manager pod nodes and respond in
+// *client.GenericCollection Data
 func (s *Server) NodeList(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -25,6 +27,7 @@ func (s *Server) NodeList(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// nodeList get all manager pod node IP mapped to node name from datastore cache,
 func (s *Server) nodeList(apiContext *api.ApiContext) (*client.GenericCollection, error) {
 	nodeList, err := s.m.ListNodesSorted()
 	if err != nil {
@@ -37,6 +40,8 @@ func (s *Server) nodeList(apiContext *api.ApiContext) (*client.GenericCollection
 	return toNodeCollection(nodeList, nodeIPMap, apiContext), nil
 }
 
+// NodeGet get a node IP and its manager pod IP for the
+// given node name in the request
 func (s *Server) NodeGet(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["name"]
@@ -53,6 +58,8 @@ func (s *Server) NodeGet(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// NodeUpdate update longhorn Node resource with lhclient for the given
+// request
 func (s *Server) NodeUpdate(rw http.ResponseWriter, req *http.Request) error {
 	var n Node
 	apiContext := api.GetApiContext(req)
@@ -88,6 +95,8 @@ func (s *Server) NodeUpdate(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// DiskUpdate updates longhorn Disk resource with lhclinet for the
+// given request
 func (s *Server) DiskUpdate(rw http.ResponseWriter, req *http.Request) error {
 	var diskUpdate DiskUpdateInput
 	apiContext := api.GetApiContext(req)
@@ -116,6 +125,8 @@ func (s *Server) DiskUpdate(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// NodeDelete deletes longhorn Node resource with lhclient for
+// the given request
 func (s *Server) NodeDelete(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 	if err := s.m.DeleteNode(id); err != nil {

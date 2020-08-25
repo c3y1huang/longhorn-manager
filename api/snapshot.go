@@ -14,6 +14,8 @@ import (
 	"github.com/longhorn/longhorn-manager/util"
 )
 
+// SnapshotCreate creates the snapshot with engine binary from the EngineImage resource
+// for the the given volume name in request
 func (s *Server) SnapshotCreate(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to create snapshot")
@@ -44,6 +46,8 @@ func (s *Server) SnapshotCreate(w http.ResponseWriter, req *http.Request) (err e
 	return nil
 }
 
+// SnapshotList get a list of snapshot with engine binary from EngineImage resource
+// for the given volume name in request
 func (s *Server) SnapshotList(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to list snapshot")
@@ -59,6 +63,8 @@ func (s *Server) SnapshotList(w http.ResponseWriter, req *http.Request) (err err
 	return nil
 }
 
+// SnapshotGet get the snapshot with engine binary in EngineImage resource
+// for the given volume name in request
 func (s *Server) SnapshotGet(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to get snapshot")
@@ -80,6 +86,8 @@ func (s *Server) SnapshotGet(w http.ResponseWriter, req *http.Request) (err erro
 	return nil
 }
 
+// SnapshotDelete deletes the snapshot with engine binary from EngineImage resource
+// for the given snapshot name and volume name in request
 func (s *Server) SnapshotDelete(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to delete snapshot")
@@ -109,6 +117,8 @@ func (s *Server) SnapshotDelete(w http.ResponseWriter, req *http.Request) (err e
 	return s.responseWithVolume(w, req, volName, nil)
 }
 
+// SnapshotRevert reverts to the snapshot with engine binary in EngineImage for
+// the given volume name and snapshot name in request
 func (s *Server) SnapshotRevert(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to revert snapshot")
@@ -142,6 +152,8 @@ func (s *Server) SnapshotRevert(w http.ResponseWriter, req *http.Request) (err e
 	return nil
 }
 
+// SnapshotBackup creates backups with engine binary in EngineImage resource
+// for the given snapshot in request
 func (s *Server) SnapshotBackup(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to backup snapshot")
@@ -190,6 +202,9 @@ func (s *Server) SnapshotBackup(w http.ResponseWriter, req *http.Request) (err e
 	return s.responseWithVolume(w, req, volName, nil)
 }
 
+// SnapshotPurge purges snapshot with engine binary in the EngineImage for
+// the given volume name and snapshot name in request. Responds with the
+// volume name
 func (s *Server) SnapshotPurge(w http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "fail to purge snapshot")

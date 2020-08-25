@@ -19,6 +19,7 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// Volume object
 type Volume struct {
 	client.Resource
 
@@ -57,21 +58,25 @@ type Volume struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// Snapshot object
 type Snapshot struct {
 	client.Resource
 	types.Snapshot
 }
 
+// BackupVolume object
 type BackupVolume struct {
 	client.Resource
 	engineapi.BackupVolume
 }
 
+// Backup object
 type Backup struct {
 	client.Resource
 	engineapi.Backup
 }
 
+// Setting object
 type Setting struct {
 	client.Resource
 	Name       string                  `json:"name"`
@@ -81,6 +86,7 @@ type Setting struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// Instance object
 type Instance struct {
 	Name                string `json:"name"`
 	NodeID              string `json:"hostId"`
@@ -91,6 +97,7 @@ type Instance struct {
 	InstanceManagerName string `json:"instanceManagerName"`
 }
 
+// Controller object
 type Controller struct {
 	Instance
 	Size                   string `json:"size"`
@@ -102,6 +109,7 @@ type Controller struct {
 	LastExpansionFailedAt  string `json:"lastExpansionFailedAt"`
 }
 
+// Replica object
 type Replica struct {
 	Instance
 
@@ -111,6 +119,7 @@ type Replica struct {
 	FailedAt string `json:"failedAt"`
 }
 
+// EngineImage object
 type EngineImage struct {
 	client.Resource
 
@@ -122,62 +131,76 @@ type EngineImage struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// AttachInput object
 type AttachInput struct {
 	HostID          string `json:"hostId"`
 	DisableFrontend bool   `json:"disableFrontend"`
 }
 
+// SnapshotInput object
 type SnapshotInput struct {
 	Name   string            `json:"name"`
 	Labels map[string]string `json:"labels"`
 }
 
+// BackupInput object
 type BackupInput struct {
 	Name string `json:"name"`
 }
 
+// RecurringInput object
 type RecurringInput struct {
 	Jobs []types.RecurringJob `json:"jobs"`
 }
 
+// ReplicaRemoveInput object
 type ReplicaRemoveInput struct {
 	Name string `json:"name"`
 }
 
+// SalvageInput object
 type SalvageInput struct {
 	Names []string `json:"names"`
 }
 
+// EngineUpgradeInput object
 type EngineUpgradeInput struct {
 	Image string `json:"image"`
 }
 
+// NodeInput object
 type NodeInput struct {
 	NodeID string `json:"nodeId"`
 }
 
+// UpdateReplicaCountInput object
 type UpdateReplicaCountInput struct {
 	ReplicaCount int `json:"replicaCount"`
 }
 
+// PVCreateInput object
 type PVCreateInput struct {
 	PVName string `json:"pvName"`
 	FSType string `json:"fsType"`
 }
 
+// PVCCreateInput object
 type PVCCreateInput struct {
 	Namespace string `json:"namespace"`
 	PVCName   string `json:"pvcName"`
 }
 
+// ActivateInput object
 type ActivateInput struct {
 	Frontend string `json:"frontend"`
 }
 
+// ExpandInput object
 type ExpandInput struct {
 	Size string `json:"size"`
 }
 
+// Node object
 type Node struct {
 	client.Resource
 	Name            string                     `json:"name"`
@@ -192,15 +215,18 @@ type Node struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// DiskInfo object
 type DiskInfo struct {
 	types.DiskSpec
 	types.DiskStatus
 }
 
+// DiskUpdateInput object
 type DiskUpdateInput struct {
 	Disks map[string]types.DiskSpec `json:"disks"`
 }
 
+// Event object
 type Event struct {
 	client.Resource
 	Event     v1.Event `json:"event"`
@@ -209,6 +235,7 @@ type Event struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// SupportBundle object
 type SupportBundle struct {
 	client.Resource
 	NodeID             string              `json:"nodeID"`
@@ -218,17 +245,20 @@ type SupportBundle struct {
 	ProgressPercentage int                 `json:"progressPercentage"`
 }
 
+// SupportBundleInitateInput object
 type SupportBundleInitateInput struct {
 	IssueURL    string `json:"issueURL"`
 	Description string `json:"description"`
 }
 
+// Tag object
 type Tag struct {
 	client.Resource
 	Name    string `json:"name"`
 	TagType string `json:"tagType"`
 }
 
+// BackupStatus object
 type BackupStatus struct {
 	client.Resource
 	Name      string `json:"id"`
@@ -240,6 +270,7 @@ type BackupStatus struct {
 	Replica   string `json:"replica"`
 }
 
+// RestoreStatus object
 type RestoreStatus struct {
 	client.Resource
 	Replica      string `json:"replica"`
@@ -252,6 +283,7 @@ type RestoreStatus struct {
 	BackupURL    string `json:"backupURL"`
 }
 
+// PurgeStatus object
 type PurgeStatus struct {
 	client.Resource
 	Error     string `json:"error"`
@@ -261,6 +293,7 @@ type PurgeStatus struct {
 	State     string `json:"state"`
 }
 
+// RebuildStatus object
 type RebuildStatus struct {
 	client.Resource
 	Error        string `json:"error"`
@@ -275,6 +308,7 @@ func generateTimestamp() string {
 	return time.Now().UTC().Format(time.RFC3339Nano)
 }
 
+// InstanceManager object
 type InstanceManager struct {
 	client.Resource
 	CurrentState types.InstanceManagerState       `json:"currentState"`
@@ -285,16 +319,19 @@ type InstanceManager struct {
 	Instances    map[string]types.InstanceProcess `json:"instances"`
 }
 
+// BackupListOutput object
 type BackupListOutput struct {
 	Data []Backup `json:"data"`
 	Type string   `json:"type"`
 }
 
+// SnapshotListOutput object
 type SnapshotListOutput struct {
 	Data []Snapshot `json:"data"`
 	Type string     `json:"type"`
 }
 
+// NewSchema returns new client.Schemas
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
 
@@ -356,6 +393,7 @@ func NewSchema() *client.Schemas {
 	return schemas
 }
 
+// nodeSchema populates Schema
 func nodeSchema(node *client.Schema) {
 	node.CollectionMethods = []string{"GET"}
 	node.ResourceMethods = []string{"GET", "PUT"}
@@ -384,18 +422,21 @@ func nodeSchema(node *client.Schema) {
 	node.ResourceFields["tags"] = tags
 }
 
+// diskSchema populates Schema
 func diskSchema(diskUpdateInput *client.Schema) {
 	disks := diskUpdateInput.ResourceFields["disks"]
 	disks.Type = "array[diskUpdate]"
 	diskUpdateInput.ResourceFields["disks"] = disks
 }
 
+// diskInfoSchema populates Schema
 func diskInfoSchema(diskInfo *client.Schema) {
 	conditions := diskInfo.ResourceFields["conditions"]
 	conditions.Type = "map[diskCondition]"
 	diskInfo.ResourceFields["conditions"] = conditions
 }
 
+// engineImageSchema populates Schema
 func engineImageSchema(engineImage *client.Schema) {
 	engineImage.CollectionMethods = []string{"GET", "POST"}
 	engineImage.ResourceMethods = []string{"GET", "DELETE"}
@@ -407,18 +448,21 @@ func engineImageSchema(engineImage *client.Schema) {
 	engineImage.ResourceFields["image"] = image
 }
 
+// recurringSchema populates Schema
 func recurringSchema(recurring *client.Schema) {
 	jobs := recurring.ResourceFields["jobs"]
 	jobs.Type = "array[recurringJob]"
 	recurring.ResourceFields["jobs"] = jobs
 }
 
+// kubernetesStatusSchema populates Schema
 func kubernetesStatusSchema(status *client.Schema) {
 	workloadsStatus := status.ResourceFields["workloadsStatus"]
 	workloadsStatus.Type = "array[workloadStatus]"
 	status.ResourceFields["workloadsStatus"] = workloadsStatus
 }
 
+// backupVolumeSchema populates Schema
 func backupVolumeSchema(backupVolume *client.Schema) {
 	backupVolume.CollectionMethods = []string{"GET"}
 	backupVolume.ResourceMethods = []string{"GET", "DELETE"}
@@ -437,6 +481,7 @@ func backupVolumeSchema(backupVolume *client.Schema) {
 	}
 }
 
+// settingSchema populates Schema
 func settingSchema(setting *client.Schema) {
 	setting.CollectionMethods = []string{"GET"}
 	setting.ResourceMethods = []string{"GET", "PUT"}
@@ -457,6 +502,7 @@ func settingSchema(setting *client.Schema) {
 	}
 }
 
+// volumeSchema populates Schema
 func volumeSchema(volume *client.Schema) {
 	volume.CollectionMethods = []string{"GET", "POST"}
 	volume.ResourceMethods = []string{"GET", "DELETE"}
@@ -626,24 +672,29 @@ func volumeSchema(volume *client.Schema) {
 	volume.ResourceFields["rebuildStatus"] = rebuildStatus
 }
 
+// snapshotSchema populates Schema
 func snapshotSchema(snapshot *client.Schema) {
 	children := snapshot.ResourceFields["children"]
 	children.Type = "map[bool]"
 	snapshot.ResourceFields["children"] = children
 }
 
+// backupListOutputSchema populates Schema
 func backupListOutputSchema(backupList *client.Schema) {
 	data := backupList.ResourceFields["data"]
 	data.Type = "array[backup]"
 	backupList.ResourceFields["data"] = data
 }
 
+// snapshotListOutputSchema populates Schema
 func snapshotListOutputSchema(snapshotList *client.Schema) {
 	data := snapshotList.ResourceFields["data"]
 	data.Type = "array[snapshot]"
 	snapshotList.ResourceFields["data"] = data
 }
 
+// toSettingResouce returns a new Setting for the given
+// setting
 func toSettingResource(setting *longhorn.Setting) *Setting {
 	timestamp := generateTimestamp()
 	return &Setting{
@@ -661,6 +712,8 @@ func toSettingResource(setting *longhorn.Setting) *Setting {
 	}
 }
 
+// toSettingCollection returns a new client.GenericCollection contains
+// the given settings in Data
 func toSettingCollection(settings []*longhorn.Setting) *client.GenericCollection {
 	data := []interface{}{}
 	for _, setting := range settings {
@@ -669,6 +722,7 @@ func toSettingCollection(settings []*longhorn.Setting) *client.GenericCollection
 	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: "setting"}}
 }
 
+// toVolumeResource updates and returns Volume object
 func toVolumeResource(v *longhorn.Volume, ves []*longhorn.Engine, vrs []*longhorn.Replica, apiContext *api.ApiContext) *Volume {
 	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
 	var ve *longhorn.Engine
@@ -907,6 +961,7 @@ func toSnapshotCollection(ss map[string]*types.Snapshot) *client.GenericCollecti
 	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: "snapshot"}}
 }
 
+// toBackupVolumeResource returns an BackupVolume object
 func toBackupVolumeResource(bv *engineapi.BackupVolume, apiContext *api.ApiContext) *BackupVolume {
 	if bv == nil {
 		logrus.Warnf("weird: nil backupVolume")
@@ -928,6 +983,7 @@ func toBackupVolumeResource(bv *engineapi.BackupVolume, apiContext *api.ApiConte
 	return b
 }
 
+// toBackupVolumeCollection
 func toBackupVolumeCollection(bv map[string]*engineapi.BackupVolume, apiContext *api.ApiContext) *client.GenericCollection {
 	data := []interface{}{}
 	for _, v := range bv {
@@ -959,6 +1015,7 @@ func toBackupCollection(bs []*engineapi.Backup) *client.GenericCollection {
 	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: "backup"}}
 }
 
+// toEngineImageResource returns a new EngineImage object
 func toEngineImageResource(ei *longhorn.EngineImage, isDefault bool) *EngineImage {
 	timestamp := generateTimestamp()
 	return &EngineImage{
@@ -985,12 +1042,14 @@ func toEngineImageCollection(eis []*longhorn.EngineImage, defaultImage string) *
 	return &client.GenericCollection{Data: data, Collection: client.Collection{ResourceType: "engineImage"}}
 }
 
+// Server object
 type Server struct {
 	m   *manager.VolumeManager
 	wsc *controller.WebsocketController
 	fwd *Fwd
 }
 
+// NewServer returns a new Server object
 func NewServer(m *manager.VolumeManager, wsc *controller.WebsocketController) *Server {
 	s := &Server{
 		m:   m,
@@ -1063,6 +1122,8 @@ func toEventResource(event v1.Event) *Event {
 	return e
 }
 
+// toEventCollection returns *client.GenericCollection for the given
+// EventList
 func toEventCollection(eventList *v1.EventList) *client.GenericCollection {
 	data := []interface{}{}
 	for _, event := range eventList.Items {

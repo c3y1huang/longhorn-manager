@@ -16,6 +16,8 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// SettingList gets a list of sorted Settings and responds with
+// client.GenericCollection
 func (s *Server) SettingList(w http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -27,6 +29,8 @@ func (s *Server) SettingList(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// settingList gets a list of sorted Setting and returns in client.GenericCollection
+// data
 func (s *Server) settingList(apiContext *api.ApiContext) (*client.GenericCollection, error) {
 	sList, err := s.m.ListSettingsSorted()
 	if err != nil || sList == nil {
@@ -35,6 +39,8 @@ func (s *Server) settingList(apiContext *api.ApiContext) (*client.GenericCollect
 	return toSettingCollection(sList), nil
 }
 
+// SettingGet gets a setting for the given name in request, and
+// returns the Setting object in reponse
 func (s *Server) SettingGet(w http.ResponseWriter, req *http.Request) error {
 	name := mux.Vars(req)["name"]
 
@@ -47,6 +53,7 @@ func (s *Server) SettingGet(w http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// SettingSet creates or updates the given setting with lhclient 
 func (s *Server) SettingSet(w http.ResponseWriter, req *http.Request) error {
 	var setting Setting
 

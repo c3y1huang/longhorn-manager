@@ -17,6 +17,7 @@ import (
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta1"
 )
 
+// VolumeList responds with all volumes with its engines and replicas
 func (s *Server) VolumeList(rw http.ResponseWriter, req *http.Request) (err error) {
 	defer func() {
 		err = errors.Wrap(err, "unable to list")
@@ -34,6 +35,8 @@ func (s *Server) VolumeList(rw http.ResponseWriter, req *http.Request) (err erro
 	return nil
 }
 
+// volumeList gets all volume with its engine and replica returns in
+// client.GenericCollection
 func (s *Server) volumeList(apiContext *api.ApiContext) (*client.GenericCollection, error) {
 	resp := &client.GenericCollection{}
 
@@ -62,11 +65,14 @@ func (s *Server) volumeList(apiContext *api.ApiContext) (*client.GenericCollecti
 	return resp, nil
 }
 
+// VolumeGet responds with volume name for the given request
 func (s *Server) VolumeGet(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 	return s.responseWithVolume(rw, req, id, nil)
 }
 
+// responseWithVolume responds with Volume object for the given volume
+// ID
 func (s *Server) responseWithVolume(rw http.ResponseWriter, req *http.Request, id string, v *longhorn.Volume) error {
 	var err error
 	apiContext := api.GetApiContext(req)
@@ -99,6 +105,7 @@ func (s *Server) responseWithVolume(rw http.ResponseWriter, req *http.Request, i
 	return nil
 }
 
+// VolumeCreate creates volume with lhclient for the given volume in request
 func (s *Server) VolumeCreate(rw http.ResponseWriter, req *http.Request) error {
 	var volume Volume
 	apiContext := api.GetApiContext(req)
@@ -171,6 +178,8 @@ func (s *Server) VolumeCreate(rw http.ResponseWriter, req *http.Request) error {
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeDelete deletes volume with lhclient for the given volume
+// name in request
 func (s *Server) VolumeDelete(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 
@@ -181,6 +190,8 @@ func (s *Server) VolumeDelete(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// VolumeAttach updates Volume resource with lhclient for the given volume
+// name and host ID
 func (s *Server) VolumeAttach(rw http.ResponseWriter, req *http.Request) error {
 	var input AttachInput
 
@@ -214,6 +225,8 @@ func (s *Server) VolumeAttach(rw http.ResponseWriter, req *http.Request) error {
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeDetach updates Volume resource for the given volume name in request,
+// This resets the NodeID and enables frontend
 func (s *Server) VolumeDetach(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 
@@ -239,6 +252,8 @@ func (s *Server) VolumeDetach(rw http.ResponseWriter, req *http.Request) error {
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeSalvage updates volume and replica with lhclient from datastore cache
+// for the given volume name 
 func (s *Server) VolumeSalvage(rw http.ResponseWriter, req *http.Request) error {
 	var input SalvageInput
 
@@ -263,6 +278,8 @@ func (s *Server) VolumeSalvage(rw http.ResponseWriter, req *http.Request) error 
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeRecurringUpdate update volume cronjobs with lhclient for the given
+// volume name
 func (s *Server) VolumeRecurringUpdate(rw http.ResponseWriter, req *http.Request) error {
 	var input RecurringInput
 	id := mux.Vars(req)["name"]
@@ -286,6 +303,8 @@ func (s *Server) VolumeRecurringUpdate(rw http.ResponseWriter, req *http.Request
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeUpdateReplicaCount updates Volume resource replica count
+// with lhclient for the given volume name and replica count in request
 func (s *Server) VolumeUpdateReplicaCount(rw http.ResponseWriter, req *http.Request) error {
 	var input UpdateReplicaCountInput
 	id := mux.Vars(req)["name"]
@@ -309,6 +328,8 @@ func (s *Server) VolumeUpdateReplicaCount(rw http.ResponseWriter, req *http.Requ
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeActivate updates volumev.Spec.Standby to false for the given
+// volume name and frontend in the request
 func (s *Server) VolumeActivate(rw http.ResponseWriter, req *http.Request) error {
 	var input ActivateInput
 
@@ -333,6 +354,8 @@ func (s *Server) VolumeActivate(rw http.ResponseWriter, req *http.Request) error
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeExpand updates the volume.Spec.Size with lhclient for the given
+// volume name and size in request
 func (s *Server) VolumeExpand(rw http.ResponseWriter, req *http.Request) error {
 	var input ExpandInput
 
@@ -370,6 +393,8 @@ func (s *Server) VolumeExpand(rw http.ResponseWriter, req *http.Request) error {
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// VolumeCancelExpansion updates volume.Spec.Size to the engine.Status.CurrentSize
+// with lhclient for the given volume name
 func (s *Server) VolumeCancelExpansion(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 
@@ -387,6 +412,8 @@ func (s *Server) VolumeCancelExpansion(rw http.ResponseWriter, req *http.Request
 	return s.responseWithVolume(rw, req, "", v)
 }
 
+// PVCreate creates the PersistentVolume resource with kubeclient
+// for the given volume name in request
 func (s *Server) PVCreate(rw http.ResponseWriter, req *http.Request) error {
 	var input PVCreateInput
 	id := mux.Vars(req)["name"]
@@ -414,6 +441,8 @@ func (s *Server) PVCreate(rw http.ResponseWriter, req *http.Request) error {
 	return s.responseWithVolume(rw, req, id, nil)
 }
 
+// PVCCreate creates the PersistentVolumeClaim with kubeclient for
+// the given volume in request
 func (s *Server) PVCCreate(rw http.ResponseWriter, req *http.Request) error {
 	var input PVCCreateInput
 	id := mux.Vars(req)["name"]
@@ -441,6 +470,8 @@ func (s *Server) PVCCreate(rw http.ResponseWriter, req *http.Request) error {
 	return s.responseWithVolume(rw, req, id, nil)
 }
 
+// ReplicaRemove deletes Replica resource with lhclient for the given
+// volume name and replica name 
 func (s *Server) ReplicaRemove(rw http.ResponseWriter, req *http.Request) error {
 	var input ReplicaRemoveInput
 
@@ -458,6 +489,8 @@ func (s *Server) ReplicaRemove(rw http.ResponseWriter, req *http.Request) error 
 	return s.responseWithVolume(rw, req, id, nil)
 }
 
+// EngineUpgrade updates engine image in Volume resource with lhclient for
+// the given volume name and engine image
 func (s *Server) EngineUpgrade(rw http.ResponseWriter, req *http.Request) error {
 	var input EngineUpgradeInput
 

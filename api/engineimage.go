@@ -11,6 +11,8 @@ import (
 	"github.com/longhorn/longhorn-manager/types"
 )
 
+// EngineImageList response with a client.GenericCollection
+// includes all engine image in Setting
 func (s *Server) EngineImageList(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -22,6 +24,9 @@ func (s *Server) EngineImageList(rw http.ResponseWriter, req *http.Request) erro
 	return nil
 }
 
+// engineImageList get a list of engine image in Setting, returns
+// in a client.GenericCollection Data. This also marks the default
+// engine image
 func (s *Server) engineImageList(apiContext *api.ApiContext) (*client.GenericCollection, error) {
 	eis, err := s.m.ListEngineImagesSorted()
 	if err != nil {
@@ -34,6 +39,9 @@ func (s *Server) engineImageList(apiContext *api.ApiContext) (*client.GenericCol
 	return toEngineImageCollection(eis, defaultImage), nil
 }
 
+// EngineImageGet get engine image in Datastore cache for the given
+// name in request. This also returns if is the default engine image
+// in response
 func (s *Server) EngineImageGet(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
@@ -51,6 +59,9 @@ func (s *Server) EngineImageGet(rw http.ResponseWriter, req *http.Request) error
 	return nil
 }
 
+// EngineImageCreate creates Engine Image resource with lhclient
+// for the given image in request. This also returns if is the default
+// engine image in response
 func (s *Server) EngineImageCreate(rw http.ResponseWriter, req *http.Request) error {
 	var img EngineImage
 	apiContext := api.GetApiContext(req)
@@ -71,6 +82,8 @@ func (s *Server) EngineImageCreate(rw http.ResponseWriter, req *http.Request) er
 	return nil
 }
 
+// EngineImageDelete deletes the Engine Image resource with lhclient
+// for the given name in request
 func (s *Server) EngineImageDelete(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["name"]
 	if err := s.m.DeleteEngineImageByName(id); err != nil {

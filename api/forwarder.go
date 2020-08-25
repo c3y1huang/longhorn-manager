@@ -11,8 +11,11 @@ import (
 	"github.com/longhorn/longhorn-manager/manager"
 )
 
+// OwnerIDFunc declars signature
 type OwnerIDFunc func(req *http.Request) (string, error)
 
+// OwnerIDFromVolume returns the volume OwnerID for the given
+// volume name in request
 func OwnerIDFromVolume(m *manager.VolumeManager) func(req *http.Request) (string, error) {
 	return func(req *http.Request) (string, error) {
 		name := mux.Vars(req)["name"]
@@ -27,6 +30,7 @@ func OwnerIDFromVolume(m *manager.VolumeManager) func(req *http.Request) (string
 	}
 }
 
+// OwnerIDFromNode returns the node ID for the given request
 func OwnerIDFromNode(m *manager.VolumeManager) func(req *http.Request) (string, error) {
 	return func(req *http.Request) (string, error) {
 		id := mux.Vars(req)["name"]
@@ -34,16 +38,19 @@ func OwnerIDFromNode(m *manager.VolumeManager) func(req *http.Request) (string, 
 	}
 }
 
+// NodeLocator interface
 type NodeLocator interface {
 	GetCurrentNodeID() string
 	Node2APIAddress(nodeID string) (string, error)
 }
 
+// Fwd object
 type Fwd struct {
 	locator NodeLocator
 	proxy   http.Handler
 }
 
+// NewFwd returns a new Fwd object
 func NewFwd(locator NodeLocator) *Fwd {
 	return &Fwd{
 		locator: locator,
@@ -51,6 +58,7 @@ func NewFwd(locator NodeLocator) *Fwd {
 	}
 }
 
+// Handler updates request for the datastore cached
 func (f *Fwd) Handler(getNodeID OwnerIDFunc, h HandleFuncWithError) HandleFuncWithError {
 	return func(w http.ResponseWriter, req *http.Request) error {
 		nodeID, err := getNodeID(req)

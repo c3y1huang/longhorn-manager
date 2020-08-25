@@ -14,12 +14,17 @@ import (
 )
 
 var (
+	// RetryCounts is the number of times to retry for API calls
 	RetryCounts   = 5
+	// RetryInterval is the time to wait between each RetryCounts
 	RetryInterval = 100 * time.Millisecond
 )
 
+// HandleFuncWithError signature declaration
 type HandleFuncWithError func(http.ResponseWriter, *http.Request) error
 
+// HandleError retry the API calls and respond with error after retry
+// exceeds
 func HandleError(s *client.Schemas, t HandleFuncWithError) http.Handler {
 	return api.ApiHandler(s, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		var err error
@@ -39,6 +44,7 @@ func HandleError(s *client.Schemas, t HandleFuncWithError) http.Handler {
 	}))
 }
 
+// NewRouter starts a new router and defines the trailing slash behavior
 func NewRouter(s *Server) *mux.Router {
 	schemas := NewSchema()
 	r := mux.NewRouter().StrictSlash(true)
