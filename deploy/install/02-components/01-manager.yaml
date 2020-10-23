@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: longhorn-manager
-        image: longhornio/longhorn-manager:master
+        image: c3y1huang/research:48-lh-manager-705932bc
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -25,13 +25,13 @@ spec:
         - -d
         - daemon
         - --engine-image
-        - longhornio/longhorn-engine:master
+        - c3y1huang/research:5-lh-engine-7e4d16c
         - --instance-manager-image
-        - longhornio/longhorn-instance-manager:v1_20201216
+        - c3y1huang/research:3-lh-im-v1_20201021
         - --share-manager-image
         - longhornio/longhorn-share-manager:v1_20210106
         - --manager-image
-        - longhornio/longhorn-manager:master
+        - c3y1huang/research:48-lh-manager-705932bc
         - --service-account
         - longhorn-service-account
         ports:
