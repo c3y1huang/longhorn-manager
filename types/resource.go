@@ -133,6 +133,7 @@ type VolumeStatus struct {
 	FrontendDisabled   bool                 `json:"frontendDisabled"`
 	RestoreRequired    bool                 `json:"restoreRequired"`
 	RestoreInitiated   bool                 `json:"restoreInitiated"`
+	RebalanceReplicas  map[string]string  	`json:"rebalanceReplicas"`
 	RemountRequestedAt string               `json:"remountRequestedAt"`
 	ExpansionRequired  bool                 `json:"expansionRequired"`
 	IsStandby          bool                 `json:"isStandby"`
@@ -252,7 +253,8 @@ type ReplicaSpec struct {
 
 type ReplicaStatus struct {
 	InstanceStatus
-	EvictionRequested bool `json:"evictionRequested"`
+	EvictionRequested  bool `json:"evictionRequested"`
+	// IsRebalancing      bool `json:"isRebalancing"`
 }
 
 type EngineImageState string

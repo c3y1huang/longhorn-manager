@@ -316,6 +316,23 @@ func (rc *ReplicaController) syncReplica(key string) (err error) {
 		return rc.ds.RemoveFinalizerForReplica(replica)
 	}
 
+	replicaAutoBalance, err :=
+		rc.ds.GetSettingAsBool(types.SettingNameReplicaAutoRebalance)
+	if err != nil {
+		log.WithError(err).Errorf("error getting replica-auto-rebalance setting")
+	}
+	if replicaAutoBalance {
+		vol, _ := rc.ds.GetVolume(replica.Spec.VolumeName)
+		existingVol := vol.DeepCopy()
+		defer func() {
+			if !reflect.DeepEqual(existingVol.Status, vol.Status) {
+				rc.ds.UpdateVolumeStatus(vol)
+				log.Errorf("[c-0][15] %v", vol.Status.RebalanceReplicas)
+			}
+		}()
+		vol = rc.rebalance(replica, vol)
+	}
+
 	existingReplica := replica.DeepCopy()
 	defer func() {
 		// we're going to update replica assume things changes
@@ -335,6 +352,279 @@ func (rc *ReplicaController) syncReplica(key string) (err error) {
 
 	return rc.instanceHandler.ReconcileInstanceState(replica, &replica.Spec.InstanceSpec, &replica.Status.InstanceStatus)
 }
+
+func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.Volume) *longhorn.Volume{
+	log := getLoggerForReplica(rc.logger, replica)
+
+	if vol.Status.RebalanceReplicas == nil {
+		vol.Status.RebalanceReplicas = make(map[string]string)
+	}
+
+	count := make(map[string]int)
+	count[replica.Spec.DiskID] = 0
+	owners := make(map[string]int)
+	volumeReplicas, _ := rc.ds.ListVolumeReplicas(replica.Spec.VolumeName)
+	for _, r := range volumeReplicas {
+		if r.Status.CurrentState == types.InstanceStateRunning {
+			diskID := r.Spec.DiskID
+			_, exist := count[diskID]
+			if exist {
+				count[diskID] += 1
+			}
+
+			ownerID := r.Status.OwnerID
+			_, exist = owners[ownerID]
+			if exist {
+				owners[ownerID] += 1
+			} else {
+				owners[ownerID] = 1
+			}
+		}
+	}
+
+	nodes, _ := rc.ds.ListReadyAndSchedulableNodes()
+	log.Errorf("[c-0][0] %v", len(nodes))
+
+	// return when there is no off balanced replicas.
+	// node = 7
+	// owners = 5
+	// replicas = 10
+	// replica - 2 = 8 off set
+	nOff := len(volumeReplicas) - len(owners)
+	if nOff == 0 {
+		log.Error("[c-0][8][0]")
+		return vol
+	}
+	log.Errorf("[c-0][8][1]owner %v, nodes %v", len(owners), len(nodes))
+	log.Errorf("[c-0][8][2]off %v", nOff)
+
+	// returns when all nodes have ownership
+	if len(owners) == len(nodes) {
+		return vol
+	}
+
+	// return when current replica disk ID is not duplicated
+	if count[replica.Spec.DiskID] <= 1 {
+		log.Errorf("[c-0][1][0] %v", count)
+		return vol
+	}
+	log.Errorf("[c-0][1][1] %v", count)
+
+	log.Errorf("[c-0][1][2] %v", vol.Status.RebalanceReplicas)
+	// add current replica name to volume rebalance replicas
+	if _, exist := vol.Status.RebalanceReplicas[replica.Name]; !exist {
+		vol.Status.RebalanceReplicas[replica.Name] = replica.Spec.HealthyAt
+		log.Errorf("[c-0][2] %v", vol.Status.RebalanceReplicas)
+		return vol
+	}
+
+	// // return if number of volume rebalance replicas not match 
+	// nDuplicate := count[replica.Spec.DiskID]  // 2
+	// nRebalance := len(vol.Status.RebalanceReplicas) // 4
+	// if nRebalance != nDuplicate {
+	// 	// recalculate
+	// 	vol.Status.RebalanceReplicas = make(map[string]string)
+	// 	log.Errorf("[c-0][7][0] %v", nDuplicate)
+	// 	log.Errorf("[c-0][7][0] %v", nRebalance)
+	// 	return vol
+	// }
+
+	keeper := ""
+	keeperHealthyAt := time.Time{}
+	for name, healthyAt := range vol.Status.RebalanceReplicas {
+		ts, err := time.Parse(time.RFC3339, healthyAt)
+		if err != nil {
+			log.Errorf("[c-0][11] %v", err)
+		}
+		keeperHealthyAt = ts
+		keeper = name
+		break
+	}
+	for name, healthyAt := range vol.Status.RebalanceReplicas {
+		ts, err := time.Parse(time.RFC3339, healthyAt)
+		if err != nil {
+			log.Errorf("[c-0][11] %v", err)
+		}
+		if keeperHealthyAt.Before(ts) {
+			continue
+		}
+		keeperHealthyAt = ts
+		keeper = name
+	}
+	log.Errorf("[c-0][10]keeper %v", keeper)
+	log.Errorf("[c-0][10]keeper %v", keeperHealthyAt)
+
+	if replica.Name != keeper {
+		return vol
+	}
+
+	// if not keeper set, set keeper
+	// if current replica is not the keeper, skip
+	// if name in rebalance list is the keeper, skip
+	// delete replica
+	// delete rebalance list
+	nDelete := len(nodes) - len(owners)
+	log.Errorf("[c-0][9][]nDelete %v", nDelete)
+	var deleted []string
+	for name := range vol.Status.RebalanceReplicas {
+		// if len(vol.Status.RebalanceReplicas[name]) == 0 {
+		// 	vol.Status.RebalanceReplicas[name] = keeper
+		// 	continue
+		// }
+
+		// if replica.Name != vol.Status.RebalanceReplicas[name] {
+		// 	log.Errorf("[c-0][6] %v", vol.Status.RebalanceReplicas[name])
+		// 	break
+		// }
+
+		// Do not delete the keeper
+		if name == keeper {
+			continue
+		}
+		err := rc.ds.DeleteReplica(name)
+		if err != nil {
+			log.Errorf("[c-0][4] %v", err)
+		}
+		log.Error("[c-0][5]")
+		deleted = append(deleted, name)
+		if len(deleted) == nDelete {
+			break
+		}
+		// delete(vol.Status.RebalanceReplicas, name)
+	}
+	if len(deleted) != 0 {
+		// reset rebalance replicas
+		vol.Status.RebalanceReplicas = make(map[string]string)
+		log.Error("[c-0][8] reset rebalance replicas")
+	}
+
+	return vol
+}
+
+// func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.Volume) *longhorn.Volume{
+// 	log := getLoggerForReplica(rc.logger, replica)
+
+// 	if vol.Status.RebalanceReplicas == nil {
+// 		vol.Status.RebalanceReplicas = make(map[string]string)
+// 	}
+
+// 	count := make(map[string]int)
+// 	count[replica.Spec.DiskID] = 0
+// 	owners := make(map[string]int)
+// 	volumeReplicas, _ := rc.ds.ListVolumeReplicas(replica.Spec.VolumeName)
+// 	for _, r := range volumeReplicas {
+// 		if r.Status.CurrentState == types.InstanceStateRunning {
+// 			diskID := r.Spec.DiskID
+// 			_, exist := count[diskID]
+// 			if exist {
+// 				count[diskID] += 1
+// 			}
+
+// 			ownerID := r.Status.OwnerID
+// 			_, exist = owners[ownerID]
+// 			if exist {
+// 				owners[ownerID] += 1
+// 			} else {
+// 				owners[ownerID] = 1
+// 			}
+// 		}
+// 	}
+
+// 	nodes, _ := rc.ds.ListReadyAndSchedulableNodes()
+// 	log.Errorf("[c-0][0] %v", len(nodes))
+
+// 	// return when there is no off balanced replicas.
+// 	// node = 7
+// 	// owners = 5
+// 	// replicas = 10
+// 	// replica - 2 = 8 off set
+// 	nOff := len(volumeReplicas) - len(owners)
+// 	if nOff == 0 {
+// 		log.Error("[c-0][8][0]")
+// 		return vol
+// 	}
+// 	log.Errorf("[c-0][8][1]owner %v, nodes %v", len(owners), len(nodes))
+// 	log.Errorf("[c-0][8][2]off %v", nOff)
+
+// 	// returns when all nodes have ownership
+// 	if len(owners) == len(nodes) {
+// 		return vol
+// 	}
+
+// 	// return when current replica disk ID is not duplicated
+// 	if count[replica.Spec.DiskID] <= 1 {
+// 		log.Errorf("[c-0][1][0] %v", count)
+// 		return vol
+// 	}
+// 	log.Errorf("[c-0][1][1] %v", count)
+
+// 	log.Errorf("[c-0][1][2] %v", vol.Status.RebalanceReplicas)
+// 	// add current replica name to volume rebalance replicas
+// 	if _, exist := vol.Status.RebalanceReplicas[replica.Name]; !exist {
+// 		vol.Status.RebalanceReplicas[replica.Name] = ""
+// 		log.Errorf("[c-0][2] %v", vol.Status.RebalanceReplicas)
+// 		return vol
+// 	}
+
+// 	// // return if number of volume rebalance replicas not match 
+// 	// nDuplicate := count[replica.Spec.DiskID]  // 2
+// 	// nRebalance := len(vol.Status.RebalanceReplicas) // 4
+// 	// if nRebalance != nDuplicate {
+// 	// 	// recalculate
+// 	// 	vol.Status.RebalanceReplicas = make(map[string]string)
+// 	// 	log.Errorf("[c-0][7][0] %v", nDuplicate)
+// 	// 	log.Errorf("[c-0][7][0] %v", nRebalance)
+// 	// 	return vol
+// 	// }
+
+// 	keeper := ""
+// 	for name := range vol.Status.RebalanceReplicas {
+// 		keeper = name
+// 		break
+// 	}
+
+// 	// if not keeper set, set keeper
+// 	// if current replica is not the keeper, skip
+// 	// if name in rebalance list is the keeper, skip
+// 	// delete replica
+// 	// delete rebalance list
+// 	nDelete := len(nodes) - len(owners)
+// 	log.Errorf("[c-0][9][]nDelete %v", nDelete)
+// 	var deleted []string
+// 	for name := range vol.Status.RebalanceReplicas {
+// 		if len(vol.Status.RebalanceReplicas[name]) == 0 {
+// 			vol.Status.RebalanceReplicas[name] = keeper
+// 			continue
+// 		}
+
+// 		if replica.Name != vol.Status.RebalanceReplicas[name] {
+// 			log.Errorf("[c-0][6] %v", vol.Status.RebalanceReplicas[name])
+// 			break
+// 		}
+
+// 		// Do not delete the keeper
+// 		if name == vol.Status.RebalanceReplicas[name] {
+// 			continue
+// 		}
+// 		err := rc.ds.DeleteReplica(name)
+// 		if err != nil {
+// 			log.Errorf("[c-0][4] %v", err)
+// 		}
+// 		log.Error("[c-0][5]")
+// 		deleted = append(deleted, name)
+// 		if len(deleted) == nDelete {
+// 			break
+// 		}
+// 		// delete(vol.Status.RebalanceReplicas, name)
+// 	}
+// 	if len(deleted) != 0 {
+// 		// reset rebalance replicas
+// 		vol.Status.RebalanceReplicas = make(map[string]string)
+// 		log.Error("[c-0][8] reset rebalance replicas")
+// 	}
+
+// 	return vol
+// }
 
 func (rc *ReplicaController) enqueueReplica(obj interface{}) {
 	key, err := controller.KeyFunc(obj)

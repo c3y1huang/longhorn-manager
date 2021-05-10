@@ -47,6 +47,7 @@ const (
 	SettingNameDefaultShareManagerImage                     = SettingName("default-share-manager-image")
 	SettingNameDefaultBackingImageManagerImage              = SettingName("default-backing-image-manager-image")
 	SettingNameReplicaSoftAntiAffinity                      = SettingName("replica-soft-anti-affinity")
+	SettingNameReplicaAutoRebalance                         = SettingName("replica-auto-rebalance")
 	SettingNameStorageOverProvisioningPercentage            = SettingName("storage-over-provisioning-percentage")
 	SettingNameStorageMinimalAvailablePercentage            = SettingName("storage-minimal-available-percentage")
 	SettingNameUpgradeChecker                               = SettingName("upgrade-checker")
@@ -93,6 +94,7 @@ var (
 		SettingNameDefaultShareManagerImage,
 		SettingNameDefaultBackingImageManagerImage,
 		SettingNameReplicaSoftAntiAffinity,
+		SettingNameReplicaAutoRebalance,
 		SettingNameStorageOverProvisioningPercentage,
 		SettingNameStorageMinimalAvailablePercentage,
 		SettingNameUpgradeChecker,
@@ -160,6 +162,7 @@ var (
 		SettingNameDefaultShareManagerImage:                     SettingDefinitionDefaultShareManagerImage,
 		SettingNameDefaultBackingImageManagerImage:              SettingDefinitionDefaultBackingImageManagerImage,
 		SettingNameReplicaSoftAntiAffinity:                      SettingDefinitionReplicaSoftAntiAffinity,
+		SettingNameReplicaAutoRebalance:						 SettingDefinitionReplicaAutoRebalance,
 		SettingNameStorageOverProvisioningPercentage:            SettingDefinitionStorageOverProvisioningPercentage,
 		SettingNameStorageMinimalAvailablePercentage:            SettingDefinitionStorageMinimalAvailablePercentage,
 		SettingNameUpgradeChecker:                               SettingDefinitionUpgradeChecker,
@@ -295,6 +298,16 @@ var (
 	SettingDefinitionReplicaSoftAntiAffinity = SettingDefinition{
 		DisplayName: "Replica Node Level Soft Anti-Affinity",
 		Description: "Allow scheduling on nodes with existing healthy replicas of the same volume",
+		Category:    SettingCategoryScheduling,
+		Type:        SettingTypeBool,
+		Required:    true,
+		ReadOnly:    false,
+		Default:     "false",
+	}
+
+	SettingDefinitionReplicaAutoRebalance = SettingDefinition{
+		DisplayName: "Replica Node Level Auto Balancing",
+		Description: "Allow rebalance replica to when discover an available node",
 		Category:    SettingCategoryScheduling,
 		Type:        SettingTypeBool,
 		Required:    true,
@@ -739,6 +752,8 @@ func ValidateInitSetting(name, value string) (err error) {
 	case SettingNameAllowRecurringJobWhileVolumeDetached:
 		fallthrough
 	case SettingNameReplicaSoftAntiAffinity:
+		fallthrough
+	case SettingNameReplicaAutoRebalance:
 		fallthrough
 	case SettingNameDisableSchedulingOnCordonedNode:
 		fallthrough
