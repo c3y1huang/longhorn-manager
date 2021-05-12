@@ -321,13 +321,23 @@ func (rc *ReplicaController) syncReplica(key string) (err error) {
 	if err != nil {
 		log.WithError(err).Errorf("error getting replica-auto-rebalance setting")
 	}
-	if replicaAutoBalance {
+	if replicaAutoBalance && 
+		replica.Status.CurrentState == types.InstanceStateRunning {
 		vol, _ := rc.ds.GetVolume(replica.Spec.VolumeName)
 		existingVol := vol.DeepCopy()
 		defer func() {
-			if !reflect.DeepEqual(existingVol.Status, vol.Status) {
-				rc.ds.UpdateVolumeStatus(vol)
+			volumeStatusChanged := !reflect.DeepEqual(existingVol.Status, vol.Status)
+			var volErr error
+			if volumeStatusChanged {
+				_, volErr = rc.ds.UpdateVolumeStatus(vol)
 				log.Errorf("[c-0][15] %v", vol.Status.RebalanceReplicas)
+			}
+			if apierrors.IsConflict(errors.Cause(volErr)) {
+				log.Errorf("[c-0][16] %v", volErr)
+				vol.Status.RebalanceReplicas = make(map[string]string)
+				rc.ds.UpdateVolumeStatus(vol)
+				// enqueueVolumeChange(vol)
+				err = nil
 			}
 		}()
 		vol = rc.rebalance(replica, vol)
@@ -341,6 +351,7 @@ func (rc *ReplicaController) syncReplica(key string) (err error) {
 		}
 		// requeue if it's conflict
 		if apierrors.IsConflict(errors.Cause(err)) {
+			logrus.Error("[c-1][2] requeue")
 			log.WithError(err).Debugf("Requeue %v due to conflict", key)
 			rc.enqueueReplica(replica)
 			err = nil
@@ -356,8 +367,9 @@ func (rc *ReplicaController) syncReplica(key string) (err error) {
 func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.Volume) *longhorn.Volume{
 	log := getLoggerForReplica(rc.logger, replica)
 
+	empty := make(map[string]string)
 	if vol.Status.RebalanceReplicas == nil {
-		vol.Status.RebalanceReplicas = make(map[string]string)
+		vol.Status.RebalanceReplicas = empty
 	}
 
 	count := make(map[string]int)
@@ -385,14 +397,10 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 	nodes, _ := rc.ds.ListReadyAndSchedulableNodes()
 	log.Errorf("[c-0][0] %v", len(nodes))
 
-	// return when there is no off balanced replicas.
-	// node = 7
-	// owners = 5
-	// replicas = 10
-	// replica - 2 = 8 off set
 	nOff := len(volumeReplicas) - len(owners)
 	if nOff == 0 {
 		log.Error("[c-0][8][0]")
+		vol.Status.RebalanceReplicas = empty
 		return vol
 	}
 	log.Errorf("[c-0][8][1]owner %v, nodes %v", len(owners), len(nodes))
@@ -400,6 +408,7 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 
 	// returns when all nodes have ownership
 	if len(owners) == len(nodes) {
+		vol.Status.RebalanceReplicas = empty
 		return vol
 	}
 
@@ -413,6 +422,13 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 	log.Errorf("[c-0][1][2] %v", vol.Status.RebalanceReplicas)
 	// add current replica name to volume rebalance replicas
 	if _, exist := vol.Status.RebalanceReplicas[replica.Name]; !exist {
+		// HealthyAt could be empty when replica is starting
+		// Do not add to volume status when HealthyAt cannot be parsed.
+		_, err := time.Parse(time.RFC3339, replica.Spec.HealthyAt)
+		if err != nil {
+			log.Errorf("[c-0][11] %v", err)
+			return vol
+		}
 		vol.Status.RebalanceReplicas[replica.Name] = replica.Spec.HealthyAt
 		log.Errorf("[c-0][2] %v", vol.Status.RebalanceReplicas)
 		return vol
@@ -435,6 +451,8 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 		ts, err := time.Parse(time.RFC3339, healthyAt)
 		if err != nil {
 			log.Errorf("[c-0][11] %v", err)
+			// vol.Status.RebalanceReplicas = empty
+			// return vol
 		}
 		keeperHealthyAt = ts
 		keeper = name
@@ -444,6 +462,7 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 		ts, err := time.Parse(time.RFC3339, healthyAt)
 		if err != nil {
 			log.Errorf("[c-0][11] %v", err)
+
 		}
 		if keeperHealthyAt.Before(ts) {
 			continue
@@ -492,11 +511,11 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 		}
 		// delete(vol.Status.RebalanceReplicas, name)
 	}
-	if len(deleted) != 0 {
-		// reset rebalance replicas
-		vol.Status.RebalanceReplicas = make(map[string]string)
-		log.Error("[c-0][8] reset rebalance replicas")
-	}
+	// if len(deleted) != 0 {
+	// 	// reset rebalance replicas
+	// 	vol.Status.RebalanceReplicas = make(map[string]string)
+	// 	log.Error("[c-0][8] reset rebalance replicas")
+	// }
 
 	return vol
 }
@@ -627,6 +646,7 @@ func (rc *ReplicaController) rebalance(replica *longhorn.Replica, vol *longhorn.
 // }
 
 func (rc *ReplicaController) enqueueReplica(obj interface{}) {
+	logrus.Error("[c-1][0] enqueueReplica")
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
@@ -884,6 +904,7 @@ func (rc *ReplicaController) enqueueInstanceManagerChange(obj interface{}) {
 		return
 	}
 
+	logrus.Error("[c-1][1] instancemanager")
 	for _, rList := range rs {
 		for _, r := range rList {
 			rc.enqueueReplica(r)
@@ -909,12 +930,14 @@ func (rc *ReplicaController) enqueueNodeChange(obj interface{}) {
 		}
 	}
 
+	logrus.Error("[c-1][1][0] nodechange")
 	// Add eviction requested replicas to the workqueue
 	for diskName, diskSpec := range node.Spec.Disks {
 		evictionRequested := node.Spec.EvictionRequested || diskSpec.EvictionRequested
 		if diskStatus, existed := node.Status.DiskStatus[diskName]; existed && evictionRequested {
 			for replicaName := range diskStatus.ScheduledReplica {
 				if replica, err := rc.ds.GetReplica(replicaName); err == nil {
+					logrus.Error("[c-1][1][1] nodechange")
 					rc.enqueueReplica(replica)
 				}
 			}
@@ -941,6 +964,7 @@ func (rc *ReplicaController) enqueueBackingImageChange(obj interface{}) {
 		}
 	}
 
+	logrus.Error("[c-1][1] backingimage")
 	for diskUUID := range backingImage.Status.DiskDownloadStateMap {
 		replicas, err := rc.ds.ListReplicasByDiskUUID(diskUUID)
 		if err != nil {
