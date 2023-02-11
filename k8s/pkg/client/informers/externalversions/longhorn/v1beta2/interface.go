@@ -50,6 +50,8 @@ type Interface interface {
 	RecurringJobs() RecurringJobInformer
 	// Replicas returns a ReplicaInformer.
 	Replicas() ReplicaInformer
+	// Samples returns a SampleInformer.
+	Samples() SampleInformer
 	// Settings returns a SettingInformer.
 	Settings() SettingInformer
 	// ShareManagers returns a ShareManagerInformer.
@@ -140,6 +142,11 @@ func (v *version) RecurringJobs() RecurringJobInformer {
 // Replicas returns a ReplicaInformer.
 func (v *version) Replicas() ReplicaInformer {
 	return &replicaInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// Samples returns a SampleInformer.
+func (v *version) Samples() SampleInformer {
+	return &sampleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Settings returns a SettingInformer.

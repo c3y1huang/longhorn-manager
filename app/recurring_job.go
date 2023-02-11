@@ -33,10 +33,15 @@ const (
 
 	SnapshotPurgeStatusInterval = 5 * time.Second
 
-	WaitInterval              = 5 * time.Second
-	DetachingWaitInterval     = 10 * time.Second
-	VolumeAttachTimeout       = 300 // 5 minutes
-	BackupProcessStartTimeout = 90  // 1.5 minutes
+	WaitInterval          = 5 * time.Second
+	DetachingWaitInterval = 10 * time.Second
+
+	VolumeAttachTimeout = 300 // 5 minutes
+
+	BackupProcessStartTimeout = 90 // 1.5 minutes
+
+	jobTypeSnapshot = string("snapshot")
+	jobTypeBackup   = string("backup")
 )
 
 type Job struct {

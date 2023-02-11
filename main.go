@@ -61,6 +61,7 @@ func main() {
 		app.SystemRolloutCmd(),
 		// TODO: Remove MigrateForPre070VolumesCmd() after v0.8.1
 		app.MigrateForPre070VolumesCmd(),
+		app.SampleCmd(),
 	}
 	a.CommandNotFound = cmdNotFound
 	a.OnUsageError = onUsageError

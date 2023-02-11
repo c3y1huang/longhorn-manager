@@ -918,6 +918,18 @@ func (s *DataStore) GetServiceAccount(name string) (*corev1.ServiceAccount, erro
 	return s.kubeClient.CoreV1().ServiceAccounts(s.namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
+func (s *DataStore) GetLonghornServiceAccountName() (string, error) { // TODO: move this to a common place
+	managerPods, err := s.ListManagerPods()
+	if err != nil {
+		return "", err
+	}
+
+	for _, pod := range managerPods {
+		return pod.Spec.ServiceAccountName, nil
+	}
+	return "", fmt.Errorf("failed to find service account from manager pods")
+}
+
 // UpdateServiceAccount updates the ServiceAccount resource with the given ServiceAccount object in the Longhorn
 // namespace
 func (s *DataStore) UpdateServiceAccount(serviceAccount *corev1.ServiceAccount) (*corev1.ServiceAccount, error) {

@@ -39,6 +39,7 @@ type LonghornV1beta2Interface interface {
 	OrphansGetter
 	RecurringJobsGetter
 	ReplicasGetter
+	SamplesGetter
 	SettingsGetter
 	ShareManagersGetter
 	SnapshotsGetter
@@ -103,6 +104,10 @@ func (c *LonghornV1beta2Client) RecurringJobs(namespace string) RecurringJobInte
 
 func (c *LonghornV1beta2Client) Replicas(namespace string) ReplicaInterface {
 	return newReplicas(c, namespace)
+}
+
+func (c *LonghornV1beta2Client) Samples(namespace string) SampleInterface {
+	return newSamples(c, namespace)
 }
 
 func (c *LonghornV1beta2Client) Settings(namespace string) SettingInterface {

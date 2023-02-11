@@ -23,8 +23,9 @@ const (
 type InstanceManagerType string
 
 const (
-	InstanceManagerTypeEngine  = InstanceManagerType("engine")
-	InstanceManagerTypeReplica = InstanceManagerType("replica")
+	InstanceManagerTypeAllInOne = InstanceManagerType("aio")
+	InstanceManagerTypeEngine   = InstanceManagerType("engine")
+	InstanceManagerTypeReplica  = InstanceManagerType("replica")
 )
 
 const (

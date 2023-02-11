@@ -122,6 +122,14 @@ type ReplicaListerExpansion interface{}
 // ReplicaNamespaceLister.
 type ReplicaNamespaceListerExpansion interface{}
 
+// SampleListerExpansion allows custom methods to be added to
+// SampleLister.
+type SampleListerExpansion interface{}
+
+// SampleNamespaceListerExpansion allows custom methods to be added to
+// SampleNamespaceLister.
+type SampleNamespaceListerExpansion interface{}
+
 // SettingListerExpansion allows custom methods to be added to
 // SettingLister.
 type SettingListerExpansion interface{}

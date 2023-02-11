@@ -2196,16 +2196,16 @@ func filterNodes(nodes map[string]*longhorn.Node, predicate func(node *longhorn.
 	return filtered
 }
 
-// filterReadyNodes returns only the nodes that are ready
-func filterReadyNodes(nodes map[string]*longhorn.Node) map[string]*longhorn.Node {
+// FilterReadyNodes returns only the nodes that are ready
+func FilterReadyNodes(nodes map[string]*longhorn.Node) map[string]*longhorn.Node {
 	return filterNodes(nodes, func(node *longhorn.Node) bool {
 		nodeReadyCondition := types.GetCondition(node.Status.Conditions, longhorn.NodeConditionTypeReady)
 		return nodeReadyCondition.Status == longhorn.ConditionStatusTrue
 	})
 }
 
-// filterSchedulableNodes returns only the nodes that are ready
-func filterSchedulableNodes(nodes map[string]*longhorn.Node) map[string]*longhorn.Node {
+// FilterSchedulableNodes returns only the nodes that are ready
+func FilterSchedulableNodes(nodes map[string]*longhorn.Node) map[string]*longhorn.Node {
 	return filterNodes(nodes, func(node *longhorn.Node) bool {
 		nodeSchedulableCondition := types.GetCondition(node.Status.Conditions, longhorn.NodeConditionTypeSchedulable)
 		return nodeSchedulableCondition.Status == longhorn.ConditionStatusTrue
@@ -2217,7 +2217,7 @@ func (s *DataStore) ListReadyNodes() (map[string]*longhorn.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	readyNodes := filterReadyNodes(nodes)
+	readyNodes := FilterReadyNodes(nodes)
 	return readyNodes, nil
 }
 
@@ -2226,7 +2226,7 @@ func (s *DataStore) ListReadyAndSchedulableNodes() (map[string]*longhorn.Node, e
 	if err != nil {
 		return nil, err
 	}
-	return filterSchedulableNodes(filterReadyNodes(nodes)), nil
+	return FilterSchedulableNodes(FilterReadyNodes(nodes)), nil
 }
 
 // ListReadyNodesWithEngineImage returns list of ready nodes that have the corresponding engine image deploying or deployed
@@ -2242,7 +2242,7 @@ func (s *DataStore) ListReadyNodesWithEngineImage(image string) (map[string]*lon
 	if err != nil {
 		return nil, err
 	}
-	readyNodes := filterReadyNodes(nodes)
+	readyNodes := FilterReadyNodes(nodes)
 	return readyNodes, nil
 }
 
@@ -2259,7 +2259,7 @@ func (s *DataStore) ListReadyNodesWithReadyEngineImage(image string) (map[string
 	if err != nil {
 		return nil, err
 	}
-	readyNodes := filterReadyNodes(nodes)
+	readyNodes := FilterReadyNodes(nodes)
 	return readyNodes, nil
 }
 
@@ -4344,4 +4344,86 @@ func (s *DataStore) listSystemRestores(selector labels.Selector) (map[string]*lo
 // ListSystemRestores returns an object contains all SystemRestores
 func (s *DataStore) ListSystemRestores() (map[string]*longhorn.SystemRestore, error) {
 	return s.listSystemRestores(labels.Everything())
+}
+
+// GetSample gets the Sample for the given name and namespace.
+// Returns a mutable Sample object
+func (s *DataStore) GetSample(name string) (*longhorn.Sample, error) {
+	result, err := s.getSampleRO(name)
+	if err != nil {
+		return nil, err
+	}
+	return result.DeepCopy(), nil
+}
+
+func (s *DataStore) getSampleRO(name string) (*longhorn.Sample, error) {
+	return s.sampleLister.Samples(s.namespace).Get(name)
+}
+
+// RemoveFinalizerForSample will result in deletion if DeletionTimestamp was set
+func (s *DataStore) RemoveFinalizerForSample(sample *longhorn.Sample) (err error) {
+	if !util.FinalizerExists(longhornFinalizerKey, sample) {
+		// finalizer already removed
+		return nil
+	}
+
+	if err = util.RemoveFinalizer(longhornFinalizerKey, sample); err != nil {
+		return err
+	}
+
+	sample, err = s.lhClient.LonghornV1beta2().Samples(s.namespace).Update(context.TODO(), sample, metav1.UpdateOptions{})
+	if err != nil {
+		// workaround `StorageError: invalid object, Code: 4` due to empty object
+		if sample.DeletionTimestamp != nil {
+			return nil
+		}
+		return errors.Wrapf(err, "unable to remove finalizer for Sample %s", sample.Name)
+	}
+	return nil
+}
+
+// UpdateSample updates Longhorn Sample and verifies update
+func (s *DataStore) UpdateSample(sample *longhorn.Sample) (*longhorn.Sample, error) {
+	if err := util.AddFinalizer(longhornFinalizerKey, sample); err != nil {
+		return nil, err
+	}
+
+	obj, err := s.lhClient.LonghornV1beta2().Samples(s.namespace).Update(context.TODO(), sample, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+	verifyUpdate(sample.Name, obj, func(name string) (runtime.Object, error) {
+		return s.getSampleRO(name)
+	})
+	return obj, nil
+}
+
+// UpdateSampleStatus updates Longhorn Sample resource status and verifies update
+func (s *DataStore) UpdateSampleStatus(sample *longhorn.Sample) (*longhorn.Sample, error) {
+	obj, err := s.lhClient.LonghornV1beta2().Samples(s.namespace).UpdateStatus(context.TODO(), sample, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	verifyUpdate(sample.Name, obj, func(name string) (runtime.Object, error) {
+		return s.getSampleRO(name)
+	})
+
+	return obj, nil
+}
+
+// GetOwnerReferencesForSample returns OwnerReference for the given Sample
+func GetOwnerReferencesForSample(sample *longhorn.Sample) []metav1.OwnerReference {
+	controller := true
+	blockOwnerDeletion := true
+	return []metav1.OwnerReference{
+		{
+			APIVersion:         longhorn.SchemeGroupVersion.String(),
+			Kind:               types.LonghornKindSample,
+			Name:               sample.Name,
+			UID:                sample.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		},
+	}
 }

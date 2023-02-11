@@ -61,6 +61,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&SystemRestoreList{},
 		&Volume{},
 		&VolumeList{},
+		&Sample{},
+		&SampleList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

@@ -44,6 +44,8 @@ type RecurringJobExpansion interface{}
 
 type ReplicaExpansion interface{}
 
+type SampleExpansion interface{}
+
 type SettingExpansion interface{}
 
 type ShareManagerExpansion interface{}

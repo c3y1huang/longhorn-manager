@@ -80,6 +80,10 @@ func (c *FakeLonghornV1beta2) Replicas(namespace string) v1beta2.ReplicaInterfac
 	return &FakeReplicas{c, namespace}
 }
 
+func (c *FakeLonghornV1beta2) Samples(namespace string) v1beta2.SampleInterface {
+	return &FakeSamples{c, namespace}
+}
+
 func (c *FakeLonghornV1beta2) Settings(namespace string) v1beta2.SettingInterface {
 	return &FakeSettings{c, namespace}
 }
