@@ -1541,6 +1541,7 @@ func (info *ClusterInfo) collectVolumesInfo() error {
 		return errors.Wrapf(err, "failed to list Longhorn Volumes")
 	}
 	volumeCount := len(volumesRO)
+	volumeCountV1 := types.GetVolumeCountByBackendStoreDriver(longhorn.BackendStoreDriverTypeV1, volumesRO)
 
 	var totalVolumeSize int
 	var totalVolumeActualSize int
@@ -1565,6 +1566,8 @@ func (info *ClusterInfo) collectVolumesInfo() error {
 		}
 		backendStoreDriverCountStruct[util.StructName(fmt.Sprintf(ClusterInfoVolumeBackendStoreDriverCountFmt, backendStoreDriver))]++
 
+		// TODO: Remove this condition when v2 volume actual size is implemented.
+		//       https://github.com/longhorn/longhorn/issues/5947
 		isVolumeUsingV2DataEngine := volume.Spec.BackendStoreDriver == longhorn.BackendStoreDriverTypeV2
 		if !isVolumeUsingV2DataEngine {
 			totalVolumeSize += int(volume.Spec.Size)
@@ -1626,19 +1629,21 @@ func (info *ClusterInfo) collectVolumesInfo() error {
 	info.structFields.fields.AppendCounted(snapshotDataIntegrityCountStruct)
 	info.structFields.fields.AppendCounted(unmapMarkSnapChainRemovedCountStruct)
 
-	var avgVolumeSnapshotCount int
+	// TODO: Use the total volume count instead when v2 volume actual size is implemented.
+	//       https://github.com/longhorn/longhorn/issues/5947
 	var avgVolumeSize int
 	var avgVolumeActualSize int
+	if volumeCountV1 > 0 && totalVolumeSize > 0 {
+		avgVolumeSize = totalVolumeSize / volumeCountV1
+
+		if totalVolumeActualSize > 0 {
+			avgVolumeActualSize = totalVolumeActualSize / volumeCountV1
+		}
+	}
+
+	var avgVolumeSnapshotCount int
 	var avgVolumeNumOfReplicas int
 	if volumeCount > 0 {
-		if totalVolumeSize > 0 {
-			avgVolumeSize = totalVolumeSize / volumeCount
-
-			if totalVolumeActualSize > 0 {
-				avgVolumeActualSize = totalVolumeActualSize / volumeCount
-			}
-		}
-
 		avgVolumeNumOfReplicas = totalVolumeNumOfReplicas / volumeCount
 
 		snapshotsRO, err := info.ds.ListSnapshotsRO(labels.Everything())

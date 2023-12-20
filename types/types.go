@@ -1112,3 +1112,13 @@ func GetPDBNameFromIMName(imName string) string {
 func GetIMNameFromPDBName(pdbName string) string {
 	return pdbName
 }
+
+func GetVolumeCountByBackendStoreDriver(driverType longhorn.BackendStoreDriverType, volumes []*longhorn.Volume) int {
+	count := 0
+	for _, volume := range volumes {
+		if volume.Spec.BackendStoreDriver == driverType {
+			count++
+		}
+	}
+	return count
+}
