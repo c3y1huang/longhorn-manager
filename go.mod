@@ -50,6 +50,8 @@ replace (
 	k8s.io/sample-controller => k8s.io/sample-controller v0.31.2
 )
 
+replace github.com/longhorn/longhorn-instance-manager => github.com/c3y1huang/longhorn-instance-manager v1.8.0-dev-20240908.0.20241101082836-57e8bbbd0bcb
+
 require (
 	github.com/container-storage-interface/spec v1.10.0
 	github.com/docker/go-connections v0.5.0
@@ -108,7 +110,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/longhorn/types v0.0.0-20241007141758-3640f2357238 // indirect
+	github.com/longhorn/types v0.0.0-20241101010532-9e901229a935 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/opencontainers/runc v1.1.14 // indirect
