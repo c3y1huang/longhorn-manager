@@ -51,7 +51,15 @@ func NewInstanceHandler(ds *datastore.DataStore, instanceManagerHandler Instance
 
 func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *longhorn.InstanceManager, instanceName string, spec *longhorn.InstanceSpec, status *longhorn.InstanceStatus, instances map[string]longhorn.InstanceProcess) {
 	defer func() {
+		logrus.Infof("[DEBUG] Finished syncing status with instance manager for instance %v, final CurrentState=%v, InstanceManagerName=%v, Starting=%v", instanceName, status.CurrentState, status.InstanceManagerName, status.Starting)
 		if status.CurrentState == longhorn.InstanceStateStopped && !status.Starting {
+			logrus.WithFields(
+				logrus.Fields{
+					"CurrentState":        status.CurrentState,
+					"InstanceManagerName": status.InstanceManagerName,
+					"Starting":            status.Starting,
+				},
+			).Infof("[DEBUG] Resetting InstanceManagerName for instance %v", instanceName)
 			status.InstanceManagerName = ""
 		}
 	}()
@@ -77,16 +85,42 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 		status.UblkID = 0
 		status.UUID = ""
 		h.resetInstanceErrorCondition(status)
+		logrus.WithFields(
+			logrus.Fields{
+				"instanceManagerNil": im == nil,
+				"instanceManagerState": func() string {
+					if im != nil {
+						return string(im.Status.CurrentState)
+					} else {
+						return "<nil>"
+					}
+				}(),
+				"instanceManagerNodeDelinquent": isDelinquent,
+			},
+		).Infof("[DEBUG] instance manager is nil or in unknown state or node is delinquent for instance %v, set instance state to %v", instanceName, status.CurrentState)
 		return
 	}
+
+	logrus.Infof("[DEBUG] instance manager not nil for instance %v, continue to sync status", instanceName)
 
 	if im.Status.CurrentState == longhorn.InstanceManagerStateStopped ||
 		im.Status.CurrentState == longhorn.InstanceManagerStateError ||
 		im.DeletionTimestamp != nil {
+		// //note
+		// volume, err := h.ds.GetVolumeRO(spec.VolumeName)
+		// if err != nil {
+		// 	logrus.Warnf("[DEBUG]Failed to get volume %v for instance %v: %v", spec.VolumeName, instanceName, err)
+		// 	return
+		// }
+		// if types.IsDataEngineV2(spec.DataEngine) && volume.Spec.Standby {
+		// 	log.Infof("[DEBUG] Instance %v is in standby volume %v, skip marking error when instance manager %v is %v", instanceName, spec.VolumeName, im.Name, im.Status.CurrentState)
+		// 	return
+		// }
 		if status.Started {
 			if status.CurrentState != longhorn.InstanceStateError {
 				logrus.Warnf("Marking the instance as state ERROR since failed to find the instance manager for the running instance %v", instanceName)
 			}
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: failed to find instance manager for running instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
 			status.CurrentState = longhorn.InstanceStateStopped
@@ -106,6 +140,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 			if status.CurrentState != longhorn.InstanceStateError {
 				logrus.Warnf("Marking the instance as state ERROR since the starting instance manager %v shouldn't contain the running instance %v", im.Name, instanceName)
 			}
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: starting instance manager shouldn't contain running instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 			status.CurrentImage = ""
 			status.IP = ""
@@ -124,6 +159,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 			if status.CurrentState != longhorn.InstanceStateError {
 				log.Warnf("Marking the instance as state ERROR since failed to find the instance status in instance manager %v for the running instance %v", im.Name, instanceName)
 			}
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: failed to find instance status in instance manager for running instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
 			status.CurrentState = longhorn.InstanceStateStopped
@@ -210,6 +246,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 
 	case longhorn.InstanceStateStopping:
 		if status.Started {
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: instance is stopping but started flag is true", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
 			status.CurrentState = longhorn.InstanceStateStopping
@@ -223,6 +260,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 		h.resetInstanceErrorCondition(status)
 	case longhorn.InstanceStateStopped:
 		if status.Started {
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: instance is stopped but started flag is true", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
 			status.CurrentState = longhorn.InstanceStateStopped
@@ -238,6 +276,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 		if status.CurrentState != longhorn.InstanceStateError {
 			log.Warnf("Instance %v is state %v, error message: %v", instanceName, instance.Status.State, instance.Status.ErrorMsg)
 		}
+		logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: instance state is unknown or error", instanceName)
 		status.CurrentState = longhorn.InstanceStateError
 		status.CurrentImage = ""
 		status.IP = ""
@@ -295,13 +334,31 @@ func (h *InstanceHandler) ReconcileInstanceState(obj interface{}, spec *longhorn
 
 	var im *longhorn.InstanceManager
 	if status.InstanceManagerName != "" {
+		logrus.Infof("[DEBUG] status.InstanceManagerName not nil,Getting instance manager %v for instance %v from status", status.InstanceManagerName, instanceName)
 		im, err = h.ds.GetInstanceManagerRO(status.InstanceManagerName)
 		if err != nil {
 			if !datastore.ErrorIsNotFound(err) {
 				return err
 			}
 		}
+		logrus.Infof("[DEBUG] instance manager not nil for instance %v, continue to sync status", instanceName)
 	}
+
+	// [DEBUG] mabe should set im == nil if is a DR volume
+	volume, err := h.ds.GetVolumeRO(spec.VolumeName)
+	if err != nil {
+		return err
+	}
+	if volume.Status.IsStandby {
+		logrus.WithFields(
+			logrus.Fields{
+				"volume":      volume.Name,
+				"spdc.Image":  spec.Image,
+				"spec.NodeID": spec.NodeID,
+			},
+		).Infof("[DEBUG] Volume %v is in standby mode, how about setting im to nil for instance %v", volume.Name, instanceName)
+	}
+
 	// There should be an available instance manager for a scheduled instance when its related engine image is compatible
 	if im == nil && spec.Image != "" && spec.NodeID != "" {
 		dataEngineEnabled, err := h.ds.IsDataEngineEnabled(spec.DataEngine)
@@ -395,21 +452,32 @@ func (h *InstanceHandler) ReconcileInstanceState(obj interface{}, spec *longhorn
 				shouldDelete = true
 				if types.IsDataEngineV2(instance.Spec.DataEngine) {
 					if instance.Status.State == longhorn.InstanceStateStopped {
+						logrus.Infof("[DEBUG] should NOT delete instance %v; instance is already stopped", instanceName)
 						shouldDelete = false
+					} else {
+						logrus.Infof("[DEBUG] should delete instance %v; instance is in state %v", instanceName, instance.Status.State)
 					}
 				}
 			}
 		}
 		if status.Starting {
+			logrus.Infof("[DEBUG] should delete instance %v; instance is starting but desire state is stopped", instanceName)
 			shouldDelete = true
 		}
 		if shouldDelete {
 			// there is a delay between deleteInstance() invocation and state/InstanceManager update,
 			// deleteInstance() may be called multiple times.
+			logrus.WithFields(
+				logrus.Fields{
+					"volumeRestoring": volume.Status.RestoreRequired,
+				},
+			).Infof("[DEBUG] Deleting instance %v as desire state is stopped", instanceName)
 			if err := h.deleteInstance(instanceName, runtimeObj); err != nil {
+				logrus.Infof("[DEBUG] Failed to delete instance %v as desire state is stopped: %v", instanceName, err)
 				return err
 			}
 		}
+		logrus.Infof("[DEBUG] Setting instance %v started and starting to false as desire state is stopped", instanceName)
 		status.Started = false
 		status.Starting = false
 	default:
@@ -423,6 +491,7 @@ func (h *InstanceHandler) ReconcileInstanceState(obj interface{}, spec *longhorn
 		// If `spec.DesireState` is `longhorn.InstanceStateStopped`, `spec.NodeID` has been unset by volume controller.
 		if spec.DesireState != longhorn.InstanceStateStopped {
 			if spec.NodeID != im.Spec.NodeID {
+				logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: ReconcileInstanceState | reason: spec.NodeID does not match instance manager NodeID", instanceName)
 				status.CurrentState = longhorn.InstanceStateError
 				status.IP = ""
 				status.StorageIP = ""

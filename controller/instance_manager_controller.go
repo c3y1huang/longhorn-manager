@@ -509,8 +509,10 @@ func (imc *InstanceManagerController) syncStatusWithPod(im *longhorn.InstanceMan
 			im.Status.Conditions = types.SetCondition(im.Status.Conditions, longhorn.InstanceManagerConditionTypePodReady,
 				longhorn.ConditionStatusFalse, longhorn.InstanceManagerConditionReasonPodStarting, "")
 		}
+	// case corev1.PodFailed:
+	// 	imc.logger.Warnf("Instance manager pod %v is in phase %s, leaving the instance manager state %v unchanged", im.Name, pod.Status.Phase, im.Status.CurrentState)
 	default:
-		imc.logger.Warnf("Instance manager pod %v is in phase %s, updating the instance manager state from %s to error", im.Name, pod.Status.Phase, im.Status.CurrentState)
+		imc.logger.Warnf("[DEBUG] Instance manager pod %v is in phase %s, updating the instance manager state from %s to error", im.Name, pod.Status.Phase, im.Status.CurrentState)
 		im.Status.CurrentState = longhorn.InstanceManagerStateError
 		im.Status.Conditions = types.SetCondition(im.Status.Conditions, longhorn.InstanceManagerConditionTypePodReady,
 			longhorn.ConditionStatusFalse, longhorn.InstanceManagerConditionReasonPodFailed, fmt.Sprintf("Instance manager pod is in phase %s", pod.Status.Phase))

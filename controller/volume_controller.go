@@ -1513,7 +1513,15 @@ func (c *VolumeController) ReconcileVolumeState(v *longhorn.Volume, es map[strin
 	}
 
 	if isAutoSalvageNeeded(rs) {
+		log.Infof("[DEBUG][Salvage] Set volume %v faulted", v.Name)
 		v.Status.Robustness = longhorn.VolumeRobustnessFaulted
+		// log.Infof("[DEBUG][Salvage] Checking if volume %v nned to be faulted", v.Name)
+		// if !v.Status.IsStandby {
+		// 	log.Infof("[DEBUG][Salvage] Set volume %v faulted", v.Name)
+		// 	v.Status.Robustness = longhorn.VolumeRobustnessFaulted
+		// } else {
+		// 	log.Infof("[DEBUG][Salvage] Volume %v is standby, skip faulting", v.Name)
+		// }
 		// If the volume is faulted, we don't need to have RWX fast failover.
 		// If shareManager is delinquent, clear both delinquent and stale state.
 		// If we don't do that volume will stuck in auto-savage loop.
@@ -1534,6 +1542,7 @@ func (c *VolumeController) ReconcileVolumeState(v *longhorn.Volume, es map[strin
 		// when volume changes from v.Status.State == longhorn.VolumeStateAttached to v.Status.State == longhorn.VolumeStateDetached,
 		// we know that volume RS has been updated and therefore the engine RS also has been updated and persisted in ETCD.
 		// At this moment, Longhorn goes into the IF statement below this IF statement and salvage all replicas.
+		// if autoSalvage && !v.Status.RestoreRequired {
 		if autoSalvage && !v.Status.IsStandby && !v.Status.RestoreRequired {
 			// Since all replica failed and autoSalvage is enable, mark engine controller salvage requested
 			e.Spec.SalvageRequested = true
@@ -1541,6 +1550,7 @@ func (c *VolumeController) ReconcileVolumeState(v *longhorn.Volume, es map[strin
 		}
 		// make sure the volume is detached before automatically salvage replicas
 		if autoSalvage && v.Status.State == longhorn.VolumeStateDetached && !v.Status.IsStandby && !v.Status.RestoreRequired {
+			// if autoSalvage && v.Status.State == longhorn.VolumeStateDetached && !v.Status.RestoreRequired {
 			log.Info("All replicas are failed, auto-salvaging volume")
 
 			lastFailedAt := time.Time{}
@@ -1627,8 +1637,9 @@ func (c *VolumeController) ReconcileVolumeState(v *longhorn.Volume, es map[strin
 		}
 
 		if e.Status.CurrentState == longhorn.InstanceStateError {
+			log.Infof("[DEBUG] e.Status.CurrentState is error for volume %s: CurrentNodeID=%s, Spec.NodeID=%s, Status.State=%s", v.Name, v.Status.CurrentNodeID, v.Spec.NodeID, v.Status.State)
 			if v.Status.CurrentNodeID != "" || (v.Spec.NodeID != "" && v.Status.CurrentNodeID == "" && v.Status.State != longhorn.VolumeStateAttached) {
-				log.Warn("Engine of volume dead unexpectedly, setting v.Status.Robustness to faulted")
+				log.Warn("[DEBUG] Engine of volume dead unexpectedly, setting v.Status.Robustness to faulted")
 				msg := fmt.Sprintf("Engine of volume %v dead unexpectedly, setting v.Status.Robustness to faulted", v.Name)
 				c.eventRecorder.Event(v, corev1.EventTypeWarning, constant.EventReasonDetachedUnexpectedly, msg)
 				e.Spec.LogRequested = true
@@ -1638,6 +1649,7 @@ func (c *VolumeController) ReconcileVolumeState(v *longhorn.Volume, es map[strin
 						rs[r.Name] = r
 					}
 				}
+				log.Infof("[DEBUG][Reconcile] Set volume %s faulted", v.Name)
 				v.Status.Robustness = longhorn.VolumeRobustnessFaulted
 				// If the volume is faulted, we don't need to have RWX fast failover.
 				// If shareManager is delinquent, clear both delinquent and stale state.
@@ -2033,6 +2045,7 @@ func (c *VolumeController) openVolumeDependentResources(v *longhorn.Volume, e *l
 			return err
 		}
 		if canIMLaunchReplica {
+			// [DEBUG] seem is blocking becasue failed at is not cleared after reboot
 			if r.Spec.FailedAt == "" && r.Spec.Image == v.Status.CurrentImage {
 				if r.Status.CurrentState == longhorn.InstanceStateStopped {
 					r.Spec.DesireState = longhorn.InstanceStateRunning
@@ -2120,7 +2133,7 @@ func (c *VolumeController) openVolumeDependentResources(v *longhorn.Volume, e *l
 	e.Spec.NodeID = v.Spec.NodeID
 	e.Spec.ReplicaAddressMap = replicaAddressMap
 	e.Spec.DesireState = longhorn.InstanceStateRunning
-	// The volume may be activated
+	// The volume may be activated[DEBUG]
 	e.Spec.DisableFrontend = v.Status.FrontendDisabled
 	e.Spec.Frontend = v.Spec.Frontend
 	e.Spec.UblkQueueDepth = v.Spec.UblkQueueDepth

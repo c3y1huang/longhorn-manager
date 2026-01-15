@@ -193,6 +193,7 @@ func (vrsc *VolumeRestoreController) reconcile(volName string) (err error) {
 
 	restoringAttachmentTicketID := longhorn.GetAttachmentTicketID(longhorn.AttacherTypeVolumeRestoreController, volName)
 
+	logrus.Infof("[DEBUG] VolumeRestoreController reconcile volume %v: RestoreRequired=%v", volName, vol.Status.RestoreRequired)
 	if vol.Status.RestoreRequired {
 		createOrUpdateAttachmentTicket(va, restoringAttachmentTicketID, vol.Status.OwnerID, longhorn.TrueValue, longhorn.AttacherTypeVolumeRestoreController)
 	} else {

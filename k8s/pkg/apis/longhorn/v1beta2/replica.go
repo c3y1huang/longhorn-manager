@@ -11,6 +11,7 @@ const (
 
 const (
 	ReplicaConditionTypeRebuildFailed                = "RebuildFailed"
+	ReplicaConditionTypeRecoveryAttempted            = "RecoveryAttempted"
 	ReplicaConditionTypeWaitForBackingImage          = "WaitForBackingImage"
 	ReplicaConditionReasonWaitForBackingImageFailed  = "GetBackingImageFailed"
 	ReplicaConditionReasonWaitForBackingImageWaiting = "Waiting"

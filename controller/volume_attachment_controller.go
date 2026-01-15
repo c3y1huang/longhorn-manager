@@ -654,9 +654,11 @@ func (vac *VolumeAttachmentController) handleVolumeAttachment(va *longhorn.Volum
 
 	// For auto salvage logic
 	// TODO: create Auto Salvage controller to handle this logic instead of AD controller
+	log.Infof("[DEBUG] Check if volume can attach, volume robustness: %v, volume is restoring: %v", vol.Status.Robustness, vol.Status.RestoreRequired)
 	if vol.Status.Robustness == longhorn.VolumeRobustnessFaulted {
 		return
 	}
+	log.Infof("[DEBUG] Volume %v can attach", vol.Name)
 
 	attachmentTicket := vac.selectAttachmentTicketToAttach(va, vol)
 	if attachmentTicket == nil {

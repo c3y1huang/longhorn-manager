@@ -33,6 +33,7 @@ import (
 	"github.com/longhorn/longhorn-manager/datastore"
 	"github.com/longhorn/longhorn-manager/engineapi"
 	"github.com/longhorn/longhorn-manager/types"
+	"github.com/longhorn/longhorn-manager/util"
 
 	longhorn "github.com/longhorn/longhorn-manager/k8s/pkg/apis/longhorn/v1beta2"
 )
@@ -298,7 +299,185 @@ func (rc *ReplicaController) syncReplica(key string) (err error) {
 		}
 	}()
 
+	// if err := rc.handleV2DRReplicaRecovery(replica, log); err != nil {
+	// 	return err
+	// }
+
 	return rc.instanceHandler.ReconcileInstanceState(replica, &replica.Spec.InstanceSpec, &replica.Status.InstanceStatus)
+}
+
+// handleV2DRReplicaRecovery handles recovery of a V2 data engine replica that
+// belongs to a disaster recovery (DR) volume after an instance manager restart.
+//
+// Scenario:
+// - The node reboots or instance manager pod restarts.
+// - SPDK detects an existing replica on disk but doesn't restart it.
+//
+// For DR volumes, replicas stay logically attached across instance manager restarts.
+// Once a healthy instance manager is available again, this function clears the
+// replicas's failed state and requests it to start.
+//
+// NOTE: Recovery is only attempted once per stopped state. If the replica fails
+// to start or is stopped again, the recovery will not be retried to avoid infinite
+// loops.
+//
+// Ref: https://github.com/longhorn/longhorn/issues/12412
+func (rc *ReplicaController) handleV2DRReplicaRecovery(replica *longhorn.Replica, log *logrus.Entry) error {
+	if !types.IsDataEngineV2(replica.Spec.DataEngine) {
+		return nil
+	}
+
+	// Clear the DR volume recovery-attempted condition only if the replica has
+	// transitioned to a healthy state after the most recent failure. This ensures
+	// that an outdated HealthyAt timestamp does not cause the condition to be
+	// cleared repeatedly, which would otherwise lead to recovery flapping.
+	rc.clearRecoveryAttemptIfRecovered(replica, log)
+
+	logrus.Infof("[DEBUG] Evaluating V2 DR replica recovery conditions: CurrentState=%v, FailedAt=%v", replica.Status.CurrentState, replica.Spec.FailedAt)
+	if replica.Status.CurrentState != longhorn.InstanceStateStopped ||
+		replica.Spec.FailedAt == "" {
+		return nil
+	}
+	logrus.Infof("[DEBUG] V2 DR replica is in stopped state with FailedAt set, checking recovery conditions")
+
+	// // Check if recovery was already attempted for this stopped state.
+	// // Use a condition to mark when we've attempted recovery, preventing repeated
+	// // recovery attempts.
+	// recoveryAttemptedCondition := types.GetCondition(replica.Status.Conditions, longhorn.ReplicaConditionTypeRecoveryAttempted)
+	// if recoveryAttemptedCondition.Status == longhorn.ConditionStatusTrue {
+	// 	// Recovery already attempted for this failure state. Don't retry to prevent
+	// 	// infinite loops.
+	// 	return nil
+	// }
+
+	// Check if this replica belongs to a DR volume.
+	volume, err := rc.ds.GetVolumeRO(replica.Spec.VolumeName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if volume == nil || !volume.Status.IsStandby {
+		return nil
+	}
+
+	// Do not attempt recovery if the volume is detaching or has been detached.
+	// Let the normal detach flow complete without interference from recovery.
+	// if volume.Status.State == longhorn.VolumeStateDetaching || volume.Status.State == longhorn.VolumeStateDetached {
+	// 	log.Debugf("Skipping recovery for replica; volume %v is in %v state", replica.Spec.VolumeName, volume.Status.State)
+	// 	return nil
+	// }
+	if volume.Status.State == longhorn.VolumeStateAttaching || volume.Status.State == longhorn.VolumeStateAttached {
+		log.Debugf("Skipping recovery for replica; volume %v is in %v state", replica.Spec.VolumeName, volume.Status.State)
+		return nil
+	}
+
+	// Instance manager must be available for recovery.
+	instanceManager, err := rc.ds.GetInstanceManagerByInstanceRO(replica)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// if instanceManager == nil ||
+	// 	(instanceManager.Status.CurrentState != longhorn.InstanceManagerStateRunning &&
+	// 		instanceManager.Status.CurrentState != longhorn.InstanceManagerStateStarting) {
+	// 	return nil
+	// }
+
+	if instanceManager == nil || instanceManager.Status.CurrentState != longhorn.InstanceManagerStateRunning {
+		log.Debugf("Skipping recovery for replica; instance manager is not running")
+		return nil
+	}
+
+	// Check if the replica's node and disk are ready for scheduling.
+	// This ensures the disk is not in eviction, disabled, or in an unhealthy state.
+	node, err := rc.ds.GetNodeRO(replica.Spec.NodeID)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		// Node not found, can't recover
+		log.Warnf("Skipping recovery for replica; node %v not found", replica.Spec.NodeID)
+		return nil
+	}
+
+	if !node.Spec.AllowScheduling {
+		log.Debugf("Skipping recovery for replica; node %v does not allow scheduling", replica.Spec.NodeID)
+		return nil
+	}
+
+	// Check disk status by matching UUID in node.Status.DiskStatus.
+	// Note: replica.Spec.DiskID is a UUID, but node.Status.DiskStatus is keyed by disk name.
+	// So we need to find the disk status by matching the UUID, then check the corresponding spec.
+	var diskStatus *longhorn.DiskStatus
+	for _, status := range node.Status.DiskStatus {
+		if status.DiskUUID == replica.Spec.DiskID {
+			diskStatus = status
+			break
+		}
+	}
+	if diskStatus == nil {
+		log.Warnf("Skipping recovery for replica; disk with UUID %v not found on node %v", replica.Spec.DiskID, replica.Spec.NodeID)
+		return nil
+	}
+
+	// Check if disk allows scheduling
+	diskSpec, exists := node.Spec.Disks[diskStatus.DiskName]
+	if exists && (!diskSpec.AllowScheduling || diskSpec.EvictionRequested) {
+		log.WithFields(logrus.Fields{
+			"allowScheduling":   diskSpec.AllowScheduling,
+			"evictionRequested": diskSpec.EvictionRequested},
+		).Debugf("Skipping recovery for replica; disk %v on node %v is not available for scheduling", diskStatus.DiskName, replica.Spec.NodeID)
+		return nil
+	}
+
+	// Check disk ready condition
+	if types.GetCondition(diskStatus.Conditions, longhorn.DiskConditionTypeReady).Status != longhorn.ConditionStatusTrue {
+		log.Debugf("Skipping recovery for replica; disk %v on node %v is not ready", diskStatus.DiskName, replica.Spec.NodeID)
+		return nil
+	}
+
+	// Check disk scheduled condition
+	if types.GetCondition(diskStatus.Conditions, longhorn.DiskConditionTypeSchedulable).Status != longhorn.ConditionStatusTrue {
+		log.Debugf("Skipping recovery for replica; disk %v on node %v is not schedulable", diskStatus.DiskName, replica.Spec.NodeID)
+		return nil
+	}
+
+	// // Additional check: Verify SPDK has actually initialized by checking if the IM has
+	// // any replica instances. A DR volume requires at least one replica to function.
+	// // If no replicas exist, SPDK initialization may still be in progress.
+	// // See: https://github.com/longhorn/longhorn/issues/12412
+	// if len(instanceManager.Status.InstanceReplicas) == 0 {
+	// 	log.Debugf("Skipping recovery for replica; instance manager has no replicas yet, SPDK disk %v may still be initializing", diskStatus.DiskName)
+	// 	return nil
+	// }
+
+	log.Info("[DEBUG] Recovering V2 DR replica after instance manager restart/recovery")
+	replica.Spec.FailedAt = ""
+	// replica.Spec.DesireState = longhorn.InstanceStateRunning
+
+	// Mark that that a recovery attempt has been made for this failure state.
+	replica.Status.Conditions = types.SetCondition(replica.Status.Conditions,
+		longhorn.ReplicaConditionTypeRecoveryAttempted,
+		longhorn.ConditionStatusTrue, "", "Attempted recovery for DR volume replica")
+
+	return nil
+}
+
+func (rc *ReplicaController) clearRecoveryAttemptIfRecovered(replica *longhorn.Replica, log *logrus.Entry) {
+	if replica.Spec.HealthyAt == "" || replica.Spec.LastFailedAt == "" {
+		return
+	}
+
+	healthyAfterLastFailure, err := util.TimestampAfterTimestamp(replica.Spec.HealthyAt, replica.Spec.LastFailedAt)
+	if err != nil {
+		log.WithError(err).Debug("Failed to compare HealthyAt and LastFailedAt while evaluating recovery condition reset")
+		return
+	}
+
+	if healthyAfterLastFailure {
+		replica.Status.Conditions = types.SetCondition(replica.Status.Conditions,
+			longhorn.ReplicaConditionTypeRecoveryAttempted,
+			longhorn.ConditionStatusFalse, "", "")
+	}
 }
 
 func (rc *ReplicaController) enqueueReplica(obj interface{}) {
@@ -581,6 +760,7 @@ func (rc *ReplicaController) DeleteInstance(obj interface{}) (err error) {
 			log.WithError(err).Warnf("Failed to delete replica process %v", r.Name)
 			if canIgnore, ignoreReason := canIgnoreReplicaDeletionFailure(im.Status.CurrentState,
 				isDelinquent); canIgnore {
+				// isDelinquent, err); canIgnore {
 				log.Warnf("Ignored the failure to delete replica process %v because %s", r.Name, ignoreReason)
 				err = nil
 			}
@@ -939,6 +1119,7 @@ func shouldSkipReplicaDeletion(imState longhorn.InstanceManagerState) (canSkip b
 
 func canIgnoreReplicaDeletionFailure(imState longhorn.InstanceManagerState, isDelinquent bool) (canIgnore bool, reason string) {
 	// Instance deletion is always best effort for an unknown instance manager.
+	logrus.Infof("[DEBUG][canIgnoreReplicaDeletionFailure] imState: %v, isDelinquent: %v", imState, isDelinquent)
 	if imState == longhorn.InstanceManagerStateUnknown {
 		return true, fmt.Sprintf("instance manager is in %v state", imState)
 	}
