@@ -683,7 +683,9 @@ func (c *VolumeController) ReconcileEngineReplicaState(v *longhorn.Volume, es ma
 					r.Name, r.Status.CurrentState, r.Spec.EngineName, r.Spec.Active, isNoAvailableBackend)
 				e.Spec.LogRequested = true
 				r.Spec.LogRequested = true
+				log.Infof("[DEBUG] Marking replica %v as failed at %v because it is not in the engine mode map", r.Name, r.Spec.FailedAt)
 				setReplicaFailedAt(r, c.nowHandler())
+				log.Infof("[DEBUG] Setting replica %v desire state to stopped because it is not in the engine mode map", r.Name)
 				r.Spec.DesireState = longhorn.InstanceStateStopped
 			}
 		}
@@ -741,6 +743,7 @@ func (c *VolumeController) ReconcileEngineReplicaState(v *longhorn.Volume, es ma
 				e.Spec.LogRequested = true
 				r.Spec.LogRequested = true
 			}
+			log.Infof("[DEBUG] Setting replica %v desire state to stopped because it is in ERR mode", r.Name)
 			r.Spec.DesireState = longhorn.InstanceStateStopped
 		} else if mode == longhorn.ReplicaModeRW {
 			now := c.nowHandler()
@@ -779,6 +782,7 @@ func (c *VolumeController) ReconcileEngineReplicaState(v *longhorn.Volume, es ma
 				r.Spec.LogRequested = true
 				shouldLogWarning = true
 			}
+			log.Infof("[DEBUG] Setting replica %v desire state to stopped because all replicas are unknown and errored", r.Name)
 			r.Spec.DesireState = longhorn.InstanceStateStopped
 		}
 		if shouldLogWarning {
@@ -795,6 +799,7 @@ func (c *VolumeController) ReconcileEngineReplicaState(v *longhorn.Volume, es ma
 			e.Spec.LogRequested = true
 			r.Spec.LogRequested = true
 			setReplicaFailedAt(r, c.nowHandler())
+			log.Infof("[DEBUG] Setting replica %v desire state to stopped because it is in error state", r.Name)
 			r.Spec.DesireState = longhorn.InstanceStateStopped
 		}
 	}
@@ -2048,6 +2053,7 @@ func (c *VolumeController) openVolumeDependentResources(v *longhorn.Volume, e *l
 			// [DEBUG] seem is blocking becasue failed at is not cleared after reboot
 			if r.Spec.FailedAt == "" && r.Spec.Image == v.Status.CurrentImage {
 				if r.Status.CurrentState == longhorn.InstanceStateStopped {
+					log.Infof("[DEBUG] Setting replica %v desire state to running because it can be launched by IM", r.Name)
 					r.Spec.DesireState = longhorn.InstanceStateRunning
 				}
 			}
@@ -2073,6 +2079,7 @@ func (c *VolumeController) openVolumeDependentResources(v *longhorn.Volume, e *l
 				if r.Spec.FailedAt == "" {
 					setReplicaFailedAt(r, c.nowHandler())
 				}
+				log.Infof("[DEBUG] Setting replica %v desire state to stopped because it can't be launched by IM", r.Name)
 				r.Spec.DesireState = longhorn.InstanceStateStopped
 			}
 		}
@@ -2132,6 +2139,7 @@ func (c *VolumeController) openVolumeDependentResources(v *longhorn.Volume, e *l
 	}
 	e.Spec.NodeID = v.Spec.NodeID
 	e.Spec.ReplicaAddressMap = replicaAddressMap
+	log.Infof("[DEBUG] Setting engine %v desire state to running", e.Name)
 	e.Spec.DesireState = longhorn.InstanceStateRunning
 	// The volume may be activated[DEBUG]
 	e.Spec.DisableFrontend = v.Status.FrontendDisabled
@@ -2162,6 +2170,7 @@ func (c *VolumeController) closeVolumeDependentResources(v *longhorn.Volume, e *
 		v.Status.Robustness = longhorn.VolumeRobustnessUnknown
 	} else {
 		if v.Status.RestoreRequired || v.Status.IsStandby {
+			logrus.Infof("[DEBUG] All replica restore failed and the volume (%v) became Faulted", v.Name)
 			v.Status.Conditions = types.SetCondition(v.Status.Conditions,
 				longhorn.VolumeConditionTypeRestore, longhorn.ConditionStatusFalse, longhorn.VolumeConditionReasonRestoreFailure, "All replica restore failed and the volume became Faulted")
 		}
@@ -2177,6 +2186,7 @@ func (c *VolumeController) closeVolumeDependentResources(v *longhorn.Volume, e *
 		}
 		e.Spec.RequestedBackupRestore = ""
 		e.Spec.NodeID = ""
+		logrus.Infof("[DEBUG] Setting engine %v desire state to stopped", e.Name)
 		e.Spec.DesireState = longhorn.InstanceStateStopped
 	}
 	// must make sure engine stopped first before stopping replicas
@@ -2207,6 +2217,7 @@ func (c *VolumeController) closeVolumeDependentResources(v *longhorn.Volume, e *
 			if v.Status.Robustness == longhorn.VolumeRobustnessFaulted {
 				r.Spec.LogRequested = true
 			}
+			logrus.Infof("[DEBUG] Setting replica %v desire state to stopped; closing volume dependent resources", r.Name)
 			r.Spec.DesireState = longhorn.InstanceStateStopped
 			rs[r.Name] = r
 		}
@@ -3712,7 +3723,7 @@ func (c *VolumeController) checkAndFinishVolumeRestore(v *longhorn.Volume, e *lo
 	}
 
 	if !isPurging && ((v.Status.Robustness == longhorn.VolumeRobustnessHealthy && allScheduledReplicasIncluded) || (v.Status.Robustness == longhorn.VolumeRobustnessDegraded && degradedVolumeSupported)) {
-		log.Infof("Restore/DR volume finished with the last restored backup %s", e.Status.LastRestoredBackup)
+		log.Infof("[DEBUG] Restore/DR volume finished with the last restored backup %s", e.Status.LastRestoredBackup)
 		v.Status.IsStandby = false
 		v.Status.RestoreRequired = false
 	}
@@ -4340,6 +4351,7 @@ func (c *VolumeController) createAndStartMatchingReplicas(v *longhorn.Volume,
 		clone.Spec.FailedAt = ""
 		clone.Spec.LastFailedAt = ""
 
+		log.Infof("[DEBUG] Setting cloned replica %v desire state to running", clone.Name)
 		clone.Spec.DesireState = longhorn.InstanceStateRunning
 		clone.Spec.Active = false
 		fixupFunc(clone, obj)
@@ -4755,6 +4767,7 @@ func (c *VolumeController) prepareReplicasAndEngineForMigration(v *longhorn.Volu
 			log.Warn("The current available migration replicas do not match the record in the migration engine status, will restart the migration engine then update the replica map")
 			migrationEngine.Spec.NodeID = ""
 			migrationEngine.Spec.ReplicaAddressMap = map[string]string{}
+			log.Infof("[DEBUG] setting migration engine %v desire state to stopped for restart", migrationEngine.Name)
 			migrationEngine.Spec.DesireState = longhorn.InstanceStateStopped
 			return false, false, nil
 		}
@@ -4766,6 +4779,7 @@ func (c *VolumeController) prepareReplicasAndEngineForMigration(v *longhorn.Volu
 
 	migrationEngine.Spec.NodeID = v.Spec.MigrationNodeID
 	migrationEngine.Spec.ReplicaAddressMap = replicaAddressMap
+	log.Infof("[DEBUG] setting migration engine %v desire state to running", migrationEngine.Name)
 	migrationEngine.Spec.DesireState = longhorn.InstanceStateRunning
 
 	if migrationEngine.Status.CurrentState != longhorn.InstanceStateRunning {

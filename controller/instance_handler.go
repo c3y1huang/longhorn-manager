@@ -74,8 +74,10 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 			if status.CurrentState != longhorn.InstanceStateUnknown {
 				log.Warnf("Marking the instance as state UNKNOWN since the related node %v of instance %v is down or deleted", spec.NodeID, instanceName)
 			}
+			log.Warnf("Marking the instance as state UNKNOWN since the related node %v of instance %v is down or deleted", spec.NodeID, instanceName)
 			status.CurrentState = longhorn.InstanceStateUnknown
 		} else {
+			log.Warnf("Marking the instance as state STOPPED since the related node %v of instance %v is down or deleted", spec.NodeID, instanceName)
 			status.CurrentState = longhorn.InstanceStateStopped
 			status.CurrentImage = ""
 		}
@@ -123,6 +125,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: failed to find instance manager for running instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateStopped for instance %v | caller: syncStatusWithInstanceManager | reason: failed to find instance manager for stopped instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateStopped
 		}
 		status.CurrentImage = ""
@@ -162,6 +165,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: failed to find instance status in instance manager for running instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateStopped for instance %v | caller: syncStatusWithInstanceManager | reason: failed to find instance status in instance manager for stopped instance", instanceName)
 			status.CurrentState = longhorn.InstanceStateStopped
 		}
 		status.CurrentImage = ""
@@ -263,6 +267,7 @@ func (h *InstanceHandler) syncStatusWithInstanceManager(log *logrus.Entry, im *l
 			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateError for instance %v | caller: syncStatusWithInstanceManager | reason: instance is stopped but started flag is true", instanceName)
 			status.CurrentState = longhorn.InstanceStateError
 		} else {
+			logrus.Infof("[DEBUG] Marking engine/replica CurrentState=InstanceStateStopped for instance %v | caller: syncStatusWithInstanceManager | reason: instance is stopped", instanceName)
 			status.CurrentState = longhorn.InstanceStateStopped
 		}
 		status.CurrentImage = ""
@@ -460,6 +465,7 @@ func (h *InstanceHandler) ReconcileInstanceState(obj interface{}, spec *longhorn
 				}
 			}
 		}
+		logrus.Infof("[DEBUG] checking whether to delete instance %v; status.Started=%v, status.Starting=%v", instanceName, status.Started, status.Starting)
 		if status.Starting {
 			logrus.Infof("[DEBUG] should delete instance %v; instance is starting but desire state is stopped", instanceName)
 			shouldDelete = true
